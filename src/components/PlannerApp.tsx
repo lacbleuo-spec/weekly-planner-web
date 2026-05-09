@@ -16,7 +16,6 @@ import {
   GripHorizontal,
   LogOut,
   Plus,
-  PlusCircle,
   Trash2,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -142,14 +141,11 @@ export default function PlannerApp() {
       return;
     }
 
-    void syncWithCloud(weeklyPlans, somedayGoals);
+    void refreshFromCloud();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.user?.uid]);
 
-  async function syncWithCloud(
-    localPlans: FirebaseWeeklyPlan[] = weeklyPlans,
-    localSomedayGoals: FirebaseSomedayGoal[] = somedayGoals,
-  ) {
+  async function refreshFromCloud() {
     if (!auth.user) return;
 
     setIsSyncing(true);
@@ -161,9 +157,33 @@ export default function PlannerApp() {
         fetchSomedayGoals(auth.user.uid),
       ]);
 
-      const mergedPlans = mergePlans(localPlans, cloudPlans);
+      setWeeklyPlans(cloudPlans);
+      setSomedayGoals(cloudSomedayGoals);
+      setLastSyncedAt(new Date());
+    } catch (error) {
+      setSyncError(
+        error instanceof Error ? error.message : 'Failed to load cloud data.',
+      );
+    } finally {
+      setIsSyncing(false);
+    }
+  }
+
+  async function syncWithCloud() {
+    if (!auth.user) return;
+
+    setIsSyncing(true);
+    setSyncError(null);
+
+    try {
+      const [cloudPlans, cloudSomedayGoals] = await Promise.all([
+        fetchWeeklyPlans(auth.user.uid),
+        fetchSomedayGoals(auth.user.uid),
+      ]);
+
+      const mergedPlans = mergePlans(weeklyPlans, cloudPlans);
       const mergedSomedayGoals = mergeSomedayGoals(
-        localSomedayGoals,
+        somedayGoals,
         cloudSomedayGoals,
       );
 
@@ -201,14 +221,11 @@ export default function PlannerApp() {
   }
 
   function savePlanChange(updatedPlan: FirebaseWeeklyPlan) {
-    const nextPlans = upsertPlan(weeklyPlans, updatedPlan);
-    setWeeklyPlans(nextPlans);
-    void syncWithCloud(nextPlans, somedayGoals);
+    setWeeklyPlans((prev) => upsertPlan(prev, updatedPlan));
   }
 
   function saveSomedayGoalsChange(updatedGoals: FirebaseSomedayGoal[]) {
     setSomedayGoals(updatedGoals);
-    void syncWithCloud(weeklyPlans, updatedGoals);
   }
 
   function moveWeek(days: number) {
@@ -237,10 +254,8 @@ export default function PlannerApp() {
       deletedAt: null,
     };
 
-    const nextGoals = [...somedayGoals, goal];
-
     setNewSomedayGoalText('');
-    saveSomedayGoalsChange(nextGoals);
+    saveSomedayGoalsChange([...somedayGoals, goal]);
   }
 
   function deleteSomedayGoal(goalId: string) {
@@ -249,11 +264,9 @@ export default function PlannerApp() {
 
     const deletedGoal = { ...target, deletedAt: now(), updatedAt: now() };
 
-    const nextGoals = somedayGoals.map((goal) =>
-      goal.id === goalId ? deletedGoal : goal,
+    saveSomedayGoalsChange(
+      somedayGoals.map((goal) => (goal.id === goalId ? deletedGoal : goal)),
     );
-
-    saveSomedayGoalsChange(nextGoals);
   }
 
   function moveSomedayGoal(goalId: string, direction: number) {
@@ -658,7 +671,7 @@ export default function PlannerApp() {
           isSyncing={isSyncing}
           syncError={syncError}
           lastSyncedAt={lastSyncedAt}
-          onSync={() => syncWithCloud(weeklyPlans, somedayGoals)}
+          onSync={syncWithCloud}
           onClose={() => setShowAuthModal(false)}
         />
       )}
