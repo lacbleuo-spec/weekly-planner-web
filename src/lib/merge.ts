@@ -1,3 +1,5 @@
+// merge
+
 import {
   FirebaseDailyGoal,
   FirebaseSomedayGoal,

@@ -30,17 +30,10 @@ import {
   weekdayShort,
 } from '@/lib/date';
 import {
-  cloudWatermark,
-  filterLocalPlansNewerThanCloud,
-  filterLocalSomedayGoalsNewerThanCloud,
-  mergePlans,
-  mergeSomedayGoals,
-} from '@/lib/merge';
-import {
   fetchSomedayGoals,
   fetchWeeklyPlans,
-  saveSomedayGoal,
-  saveWeeklyPlan,
+  replaceCloudSomedayGoals,
+  replaceCloudWeeklyPlans,
 } from '@/services/plannerService';
 import {
   FirebaseDailyGoal,
@@ -72,14 +65,21 @@ function upsertPlan(
   return plans.map((plan) => (plan.id === updatedPlan.id ? updatedPlan : plan));
 }
 
+function activePlanForUpload(plan: FirebaseWeeklyPlan): FirebaseWeeklyPlan {
+  return {
+    ...plan,
+    deletedAt: null,
+    weeklyGoals: plan.weeklyGoals.filter((goal) => !goal.deletedAt),
+    dailyGoals: plan.dailyGoals.filter((goal) => !goal.deletedAt),
+  };
+}
+
 export default function PlannerApp() {
   const auth = useAuth();
 
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
-  const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
 
   const [selectedWeekStartDate, setSelectedWeekStartDate] = useState(
     startOfWeek(new Date()),
@@ -145,14 +145,13 @@ export default function PlannerApp() {
       setWeeklyPlans([]);
       setSomedayGoals([]);
       setLastSyncedAt(null);
-      setHasUnsyncedChanges(false);
+      setSyncError(null);
     }
   }, [auth.user?.uid]);
 
-  async function refreshFromCloud() {
+  async function downloadFromCloud() {
     if (!auth.user) return;
 
-    setIsSyncing(true);
     setSyncError(null);
 
     try {
@@ -164,68 +163,39 @@ export default function PlannerApp() {
       setWeeklyPlans(cloudPlans);
       setSomedayGoals(cloudSomedayGoals);
       setLastSyncedAt(new Date());
-      setHasUnsyncedChanges(false);
     } catch (error) {
       setSyncError(
-        error instanceof Error ? error.message : 'Failed to load cloud data.',
+        error instanceof Error
+          ? error.message
+          : 'Failed to download cloud data.',
       );
-    } finally {
-      setIsSyncing(false);
     }
   }
 
-  async function syncWithCloud() {
+  async function uploadToCloud() {
     if (!auth.user) return;
 
-    if (!hasUnsyncedChanges) {
-      await refreshFromCloud();
-      return;
-    }
-
-    setIsSyncing(true);
     setSyncError(null);
 
     try {
-      const [cloudPlans, cloudSomedayGoals] = await Promise.all([
-        fetchWeeklyPlans(auth.user.uid),
-        fetchSomedayGoals(auth.user.uid),
-      ]);
+      const plansToUpload = weeklyPlans
+        .filter((plan) => !plan.deletedAt)
+        .map(activePlanForUpload);
 
-      const watermark = cloudWatermark(cloudPlans, cloudSomedayGoals);
-
-      const validLocalPlans = filterLocalPlansNewerThanCloud(
-        weeklyPlans,
-        watermark,
-      );
-
-      const validLocalSomedayGoals = filterLocalSomedayGoalsNewerThanCloud(
-        somedayGoals,
-        watermark,
-      );
-
-      const mergedPlans = mergePlans(validLocalPlans, cloudPlans);
-      const mergedSomedayGoals = mergeSomedayGoals(
-        validLocalSomedayGoals,
-        cloudSomedayGoals,
+      const somedayGoalsToUpload = somedayGoals.filter(
+        (goal) => !goal.deletedAt,
       );
 
       await Promise.all([
-        ...mergedPlans.map((plan) => saveWeeklyPlan(auth.user!.uid, plan)),
-        ...mergedSomedayGoals.map((goal) =>
-          saveSomedayGoal(auth.user!.uid, goal),
-        ),
+        replaceCloudWeeklyPlans(auth.user.uid, plansToUpload),
+        replaceCloudSomedayGoals(auth.user.uid, somedayGoalsToUpload),
       ]);
 
-      setWeeklyPlans(mergedPlans);
-      setSomedayGoals(mergedSomedayGoals);
       setLastSyncedAt(new Date());
-      setHasUnsyncedChanges(false);
     } catch (error) {
       setSyncError(
-        error instanceof Error ? error.message : 'Failed to sync cloud data.',
+        error instanceof Error ? error.message : 'Failed to upload cloud data.',
       );
-    } finally {
-      setIsSyncing(false);
     }
   }
 
@@ -244,12 +214,10 @@ export default function PlannerApp() {
 
   function savePlanChange(updatedPlan: FirebaseWeeklyPlan) {
     setWeeklyPlans((prev) => upsertPlan(prev, updatedPlan));
-    setHasUnsyncedChanges(true);
   }
 
   function saveSomedayGoalsChange(updatedGoals: FirebaseSomedayGoal[]) {
     setSomedayGoals(updatedGoals);
-    setHasUnsyncedChanges(true);
   }
 
   function moveWeek(days: number) {
@@ -500,14 +468,13 @@ export default function PlannerApp() {
               </h2>
 
               <p className='mt-0.5 truncate text-[12px] text-gray-500'>
-                {auth.user?.email ?? 'Log in to use cloud sync'}
+                {auth.user?.email ?? 'Log in to use cloud backup'}
               </p>
             </div>
 
             <button
               onClick={() => setShowAuthModal(true)}
-              disabled={isSyncing}
-              className='flex items-center gap-1.5 text-[15px] font-semibold text-blue-500 disabled:opacity-50'
+              className='flex items-center gap-1.5 text-[15px] font-semibold text-blue-500'
             >
               <CloudIcon
                 size={18}
@@ -692,10 +659,10 @@ export default function PlannerApp() {
       {showAuthModal && (
         <AuthModal
           auth={auth}
-          isSyncing={isSyncing}
           syncError={syncError}
           lastSyncedAt={lastSyncedAt}
-          onSync={syncWithCloud}
+          onUpload={uploadToCloud}
+          onDownload={downloadFromCloud}
           onClose={() => setShowAuthModal(false)}
         />
       )}
@@ -911,23 +878,26 @@ function DailyGoalRow({
 
 function AuthModal({
   auth,
-  isSyncing,
   syncError,
   lastSyncedAt,
-  onSync,
+  onUpload,
+  onDownload,
   onClose,
 }: {
   auth: ReturnType<typeof useAuth>;
-  isSyncing: boolean;
   syncError: string | null;
   lastSyncedAt: Date | null;
-  onSync: () => Promise<void>;
+  onUpload: () => Promise<void>;
+  onDownload: () => Promise<void>;
   onClose: () => void;
 }) {
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   async function submit() {
     if (isCreatingAccount) {
@@ -942,6 +912,32 @@ function AuthModal({
     }
 
     onClose();
+  }
+
+  async function confirmDownload() {
+    const confirmed = window.confirm("Download replaces this device's data.");
+    if (!confirmed) return;
+
+    setIsDownloading(true);
+
+    try {
+      await onDownload();
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  async function confirmUpload() {
+    const confirmed = window.confirm('Upload replaces cloud data.');
+    if (!confirmed) return;
+
+    setIsUploading(true);
+
+    try {
+      await onUpload();
+    } finally {
+      setIsUploading(false);
+    }
   }
 
   if (auth.isLoggedIn) {
@@ -959,13 +955,19 @@ function AuthModal({
             <p className='text-[14px] text-gray-500'>{auth.user?.email}</p>
 
             <button
-              onClick={async () => {
-                await onSync();
-              }}
-              disabled={isSyncing}
+              onClick={confirmDownload}
+              disabled={isUploading || isDownloading}
               className='w-full rounded-[16px] bg-blue-500 p-4 font-semibold text-white disabled:opacity-50'
             >
-              {isSyncing ? 'Syncing...' : 'Sync with Cloud'}
+              {isDownloading ? 'Working...' : 'Download from Cloud'}
+            </button>
+
+            <button
+              onClick={confirmUpload}
+              disabled={isUploading || isDownloading}
+              className='w-full rounded-[16px] bg-blue-500 p-4 font-semibold text-white disabled:opacity-50'
+            >
+              {isUploading ? 'Working...' : 'Upload to Cloud'}
             </button>
 
             {syncError && (
@@ -974,7 +976,7 @@ function AuthModal({
 
             {lastSyncedAt && (
               <p className='text-[12px] text-gray-500'>
-                Last synced:{' '}
+                Last updated:{' '}
                 {lastSyncedAt.toLocaleString('en-US', {
                   dateStyle: 'medium',
                   timeStyle: 'short',
@@ -1015,8 +1017,8 @@ function AuthModal({
 
           <p className='text-center text-[14px] text-gray-500'>
             {isCreatingAccount
-              ? 'Create an account to sync your planner.'
-              : 'Log in to sync your planner.'}
+              ? 'Create an account to back up your planner.'
+              : 'Log in to use cloud backup.'}
           </p>
 
           <input

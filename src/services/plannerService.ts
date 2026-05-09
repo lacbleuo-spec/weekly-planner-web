@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteDoc,
   doc,
   getDocs,
   setDoc,
@@ -52,22 +53,51 @@ export async function fetchSomedayGoals(
   return snapshot.docs.map((doc) => doc.data() as FirebaseSomedayGoal);
 }
 
-export async function saveWeeklyPlan(userId: string, plan: FirebaseWeeklyPlan) {
-  const id = weekKey(plan.weekStartDate.toDate());
+export async function replaceCloudWeeklyPlans(
+  userId: string,
+  plans: FirebaseWeeklyPlan[],
+) {
+  const collectionRef = collection(db, 'users', userId, 'weeklyPlans');
+  const snapshot = await getDocs(collectionRef);
 
-  await setDoc(
-    doc(db, 'users', userId, 'weeklyPlans', id),
-    cleanUndefined(plan),
+  await Promise.all(
+    snapshot.docs.map((document) =>
+      deleteDoc(doc(db, 'users', userId, 'weeklyPlans', document.id)),
+    ),
+  );
+
+  await Promise.all(
+    plans.map((plan) => {
+      const id = weekKey(plan.weekStartDate.toDate());
+
+      return setDoc(
+        doc(db, 'users', userId, 'weeklyPlans', id),
+        cleanUndefined(plan),
+      );
+    }),
   );
 }
 
-export async function saveSomedayGoal(
+export async function replaceCloudSomedayGoals(
   userId: string,
-  goal: FirebaseSomedayGoal,
+  goals: FirebaseSomedayGoal[],
 ) {
-  await setDoc(
-    doc(db, 'users', userId, 'somedayGoals', goal.id),
-    cleanUndefined(goal),
+  const collectionRef = collection(db, 'users', userId, 'somedayGoals');
+  const snapshot = await getDocs(collectionRef);
+
+  await Promise.all(
+    snapshot.docs.map((document) =>
+      deleteDoc(doc(db, 'users', userId, 'somedayGoals', document.id)),
+    ),
+  );
+
+  await Promise.all(
+    goals.map((goal) =>
+      setDoc(
+        doc(db, 'users', userId, 'somedayGoals', goal.id),
+        cleanUndefined(goal),
+      ),
+    ),
   );
 }
 
