@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   creator: 'Weekly Goal-Based Planner',
   publisher: 'Weekly Goal-Based Planner',
 
-  metadataBase: new URL('https://weekly-planner-web-five.vercel.app/'),
+  metadataBase: new URL('https://weekly-planner-web-rlsn.vercel.app/'),
 
   openGraph: {
     title: 'Weekly Goal-Based Planner',
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     description:
       'Plan weekly goals, daily goals, and someday goals with cloud sync.',
 
-    url: 'https://weekly-planner-web-five.vercel.app/',
+    url: 'https://weekly-planner-web-rlsn.vercel.app/',
 
     siteName: 'Weekly Goal-Based Planner',
 
