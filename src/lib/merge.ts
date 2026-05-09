@@ -10,7 +10,7 @@ function timeValue(date: { toMillis: () => number } | null | undefined) {
   return date?.toMillis() ?? 0;
 }
 
-function effectiveUpdatedAtPlan(plan: FirebaseWeeklyPlan) {
+export function effectiveUpdatedAtPlan(plan: FirebaseWeeklyPlan) {
   return Math.max(
     timeValue(plan.deletedAt),
     timeValue(plan.updatedAt),
@@ -18,7 +18,7 @@ function effectiveUpdatedAtPlan(plan: FirebaseWeeklyPlan) {
   );
 }
 
-function effectiveUpdatedAtWeeklyGoal(goal: FirebaseWeeklyGoal) {
+export function effectiveUpdatedAtWeeklyGoal(goal: FirebaseWeeklyGoal) {
   return Math.max(
     timeValue(goal.deletedAt),
     timeValue(goal.updatedAt),
@@ -26,7 +26,7 @@ function effectiveUpdatedAtWeeklyGoal(goal: FirebaseWeeklyGoal) {
   );
 }
 
-function effectiveUpdatedAtDailyGoal(goal: FirebaseDailyGoal) {
+export function effectiveUpdatedAtDailyGoal(goal: FirebaseDailyGoal) {
   return Math.max(
     timeValue(goal.deletedAt),
     timeValue(goal.updatedAt),
@@ -34,12 +34,37 @@ function effectiveUpdatedAtDailyGoal(goal: FirebaseDailyGoal) {
   );
 }
 
-function effectiveUpdatedAtSomedayGoal(goal: FirebaseSomedayGoal) {
+export function effectiveUpdatedAtSomedayGoal(goal: FirebaseSomedayGoal) {
   return Math.max(
     timeValue(goal.deletedAt),
     timeValue(goal.updatedAt),
     timeValue(goal.createdAt),
   );
+}
+
+export function cloudWatermark(
+  plans: FirebaseWeeklyPlan[],
+  somedayGoals: FirebaseSomedayGoal[],
+) {
+  let latest = 0;
+
+  for (const plan of plans) {
+    latest = Math.max(latest, effectiveUpdatedAtPlan(plan));
+
+    for (const goal of plan.weeklyGoals) {
+      latest = Math.max(latest, effectiveUpdatedAtWeeklyGoal(goal));
+    }
+
+    for (const goal of plan.dailyGoals) {
+      latest = Math.max(latest, effectiveUpdatedAtDailyGoal(goal));
+    }
+  }
+
+  for (const goal of somedayGoals) {
+    latest = Math.max(latest, effectiveUpdatedAtSomedayGoal(goal));
+  }
+
+  return latest;
 }
 
 function newerWeeklyGoal(
@@ -101,20 +126,6 @@ function mergePlansForSameWeek(
     }
   }
 
-  const weeklyGoals = Array.from(weeklyGoalMap.values()).sort(
-    (a, b) => a.order - b.order,
-  );
-
-  const dailyGoals = Array.from(dailyGoalMap.values()).sort((a, b) => {
-    const dateDiff = a.date.toMillis() - b.date.toMillis();
-
-    if (dateDiff !== 0) {
-      return dateDiff;
-    }
-
-    return a.order - b.order;
-  });
-
   return {
     id: basePlan.id,
     weekStartDate: basePlan.weekStartDate,
@@ -122,8 +133,13 @@ function mergePlansForSameWeek(
     createdAt: basePlan.createdAt,
     updatedAt: basePlan.updatedAt,
     deletedAt: basePlan.deletedAt,
-    weeklyGoals,
-    dailyGoals,
+    weeklyGoals: Array.from(weeklyGoalMap.values()).sort(
+      (a, b) => a.order - b.order,
+    ),
+    dailyGoals: Array.from(dailyGoalMap.values()).sort((a, b) => {
+      const dateDiff = a.date.toMillis() - b.date.toMillis();
+      return dateDiff !== 0 ? dateDiff : a.order - b.order;
+    }),
   };
 }
 
@@ -133,14 +149,13 @@ export function mergePlans(
 ): FirebaseWeeklyPlan[] {
   const groupedPlans = new Map<string, FirebaseWeeklyPlan[]>();
 
-  for (const plan of [...localPlans, ...cloudPlans]) {
+  for (const plan of [...cloudPlans, ...localPlans]) {
     const key = weekKey(plan.weekStartDate.toDate());
-    const existing = groupedPlans.get(key) ?? [];
-    groupedPlans.set(key, [...existing, plan]);
+    groupedPlans.set(key, [...(groupedPlans.get(key) ?? []), plan]);
   }
 
   return Array.from(groupedPlans.values())
-    .map((plans) => mergePlansForSameWeek(plans))
+    .map(mergePlansForSameWeek)
     .sort((a, b) => a.weekStartDate.toMillis() - b.weekStartDate.toMillis());
 }
 
@@ -150,10 +165,48 @@ export function mergeSomedayGoals(
 ): FirebaseSomedayGoal[] {
   const goalMap = new Map<string, FirebaseSomedayGoal>();
 
-  for (const goal of [...localGoals, ...cloudGoals]) {
+  for (const goal of [...cloudGoals, ...localGoals]) {
     const existing = goalMap.get(goal.id);
     goalMap.set(goal.id, existing ? newerSomedayGoal(existing, goal) : goal);
   }
 
   return Array.from(goalMap.values()).sort((a, b) => a.order - b.order);
+}
+
+export function filterLocalPlansNewerThanCloud(
+  localPlans: FirebaseWeeklyPlan[],
+  watermark: number,
+): FirebaseWeeklyPlan[] {
+  return localPlans.flatMap((plan) => {
+    const weeklyGoals = plan.weeklyGoals.filter(
+      (goal) => effectiveUpdatedAtWeeklyGoal(goal) > watermark,
+    );
+
+    const dailyGoals = plan.dailyGoals.filter(
+      (goal) => effectiveUpdatedAtDailyGoal(goal) > watermark,
+    );
+
+    const planIsNewer = effectiveUpdatedAtPlan(plan) > watermark;
+
+    if (!planIsNewer && weeklyGoals.length === 0 && dailyGoals.length === 0) {
+      return [];
+    }
+
+    return [
+      {
+        ...plan,
+        weeklyGoals,
+        dailyGoals,
+      },
+    ];
+  });
+}
+
+export function filterLocalSomedayGoalsNewerThanCloud(
+  localGoals: FirebaseSomedayGoal[],
+  watermark: number,
+): FirebaseSomedayGoal[] {
+  return localGoals.filter(
+    (goal) => effectiveUpdatedAtSomedayGoal(goal) > watermark,
+  );
 }

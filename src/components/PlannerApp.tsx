@@ -29,7 +29,13 @@ import {
   startOfWeek,
   weekdayShort,
 } from '@/lib/date';
-import { mergePlans, mergeSomedayGoals } from '@/lib/merge';
+import {
+  cloudWatermark,
+  filterLocalPlansNewerThanCloud,
+  filterLocalSomedayGoalsNewerThanCloud,
+  mergePlans,
+  mergeSomedayGoals,
+} from '@/lib/merge';
 import {
   fetchSomedayGoals,
   fetchWeeklyPlans,
@@ -73,6 +79,7 @@ export default function PlannerApp() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
 
   const [selectedWeekStartDate, setSelectedWeekStartDate] = useState(
     startOfWeek(new Date()),
@@ -138,6 +145,7 @@ export default function PlannerApp() {
       setWeeklyPlans([]);
       setSomedayGoals([]);
       setLastSyncedAt(null);
+      setHasUnsyncedChanges(false);
     }
   }, [auth.user?.uid]);
 
@@ -156,6 +164,7 @@ export default function PlannerApp() {
       setWeeklyPlans(cloudPlans);
       setSomedayGoals(cloudSomedayGoals);
       setLastSyncedAt(new Date());
+      setHasUnsyncedChanges(false);
     } catch (error) {
       setSyncError(
         error instanceof Error ? error.message : 'Failed to load cloud data.',
@@ -168,6 +177,11 @@ export default function PlannerApp() {
   async function syncWithCloud() {
     if (!auth.user) return;
 
+    if (!hasUnsyncedChanges) {
+      await refreshFromCloud();
+      return;
+    }
+
     setIsSyncing(true);
     setSyncError(null);
 
@@ -177,14 +191,23 @@ export default function PlannerApp() {
         fetchSomedayGoals(auth.user.uid),
       ]);
 
-      const mergedPlans = mergePlans(weeklyPlans, cloudPlans);
-      const mergedSomedayGoals = mergeSomedayGoals(
-        somedayGoals,
-        cloudSomedayGoals,
+      const watermark = cloudWatermark(cloudPlans, cloudSomedayGoals);
+
+      const validLocalPlans = filterLocalPlansNewerThanCloud(
+        weeklyPlans,
+        watermark,
       );
 
-      setWeeklyPlans(mergedPlans);
-      setSomedayGoals(mergedSomedayGoals);
+      const validLocalSomedayGoals = filterLocalSomedayGoalsNewerThanCloud(
+        somedayGoals,
+        watermark,
+      );
+
+      const mergedPlans = mergePlans(validLocalPlans, cloudPlans);
+      const mergedSomedayGoals = mergeSomedayGoals(
+        validLocalSomedayGoals,
+        cloudSomedayGoals,
+      );
 
       await Promise.all([
         ...mergedPlans.map((plan) => saveWeeklyPlan(auth.user!.uid, plan)),
@@ -193,7 +216,10 @@ export default function PlannerApp() {
         ),
       ]);
 
+      setWeeklyPlans(mergedPlans);
+      setSomedayGoals(mergedSomedayGoals);
       setLastSyncedAt(new Date());
+      setHasUnsyncedChanges(false);
     } catch (error) {
       setSyncError(
         error instanceof Error ? error.message : 'Failed to sync cloud data.',
@@ -218,10 +244,12 @@ export default function PlannerApp() {
 
   function savePlanChange(updatedPlan: FirebaseWeeklyPlan) {
     setWeeklyPlans((prev) => upsertPlan(prev, updatedPlan));
+    setHasUnsyncedChanges(true);
   }
 
   function saveSomedayGoalsChange(updatedGoals: FirebaseSomedayGoal[]) {
     setSomedayGoals(updatedGoals);
+    setHasUnsyncedChanges(true);
   }
 
   function moveWeek(days: number) {
