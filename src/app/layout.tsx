@@ -4,6 +4,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
+  verification: { google: 'JhI_X0rKnL0y87h2f0InId_MAudMVXJKfhp5wNFZt_o' },
+
   title: {
     default: 'Weekly Goal-Based Planner',
     template: '%s | Weekly Goal-Based Planner',
