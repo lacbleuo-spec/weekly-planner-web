@@ -138,11 +138,7 @@ export default function PlannerApp() {
       setWeeklyPlans([]);
       setSomedayGoals([]);
       setLastSyncedAt(null);
-      return;
     }
-
-    void refreshFromCloud();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.user?.uid]);
 
   async function refreshFromCloud() {
