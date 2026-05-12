@@ -6,11 +6,45 @@ import { useEffect, useState } from 'react';
 import {
   User,
   createUserWithEmailAndPassword,
+  deleteUser,
+  EmailAuthProvider,
   onAuthStateChanged,
+  reauthenticateWithCredential,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+
+function authErrorMessage(error: unknown) {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+  ) {
+    switch (error.code) {
+      case 'auth/invalid-credential':
+      case 'auth/user-not-found':
+      case 'auth/wrong-password':
+      case 'auth/invalid-email':
+        return 'Invalid email or password.';
+
+      case 'auth/email-already-in-use':
+        return 'This email is already in use.';
+
+      case 'auth/weak-password':
+        return 'Password should be at least 6 characters.';
+
+      case 'auth/requires-recent-login':
+        return 'Please log in again and try deleting your account.';
+
+      default:
+        return error instanceof Error ? error.message : 'Something went wrong.';
+    }
+  }
+
+  return error instanceof Error ? error.message : 'Something went wrong.';
+}
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -33,9 +67,8 @@ export function useAuth() {
     try {
       await createUserWithEmailAndPassword(auth, email, password);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Failed to sign up.',
-      );
+      setErrorMessage(authErrorMessage(error));
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -48,9 +81,8 @@ export function useAuth() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Failed to sign in.',
-      );
+      setErrorMessage(authErrorMessage(error));
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -61,10 +93,42 @@ export function useAuth() {
 
     try {
       await firebaseSignOut(auth);
+      setUser(null);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Failed to sign out.',
+      setErrorMessage(authErrorMessage(error));
+      throw error;
+    }
+  }
+
+  async function reauthenticateAndDelete(password: string) {
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const currentUser = auth.currentUser;
+
+      if (!currentUser || !currentUser.email) {
+        throw new Error('No signed-in user found.');
+      }
+
+      if (!password.trim()) {
+        throw new Error('Please enter your password.');
+      }
+
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        password,
       );
+
+      await reauthenticateWithCredential(currentUser, credential);
+      await deleteUser(currentUser);
+
+      setUser(null);
+    } catch (error) {
+      setErrorMessage(authErrorMessage(error));
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -77,5 +141,6 @@ export function useAuth() {
     signUp,
     signIn,
     signOut,
+    reauthenticateAndDelete,
   };
 }

@@ -101,6 +101,26 @@ export async function replaceCloudSomedayGoals(
   );
 }
 
+export async function deleteCloudUserData(userId: string) {
+  const weeklyPlansSnapshot = await getDocs(
+    collection(db, 'users', userId, 'weeklyPlans'),
+  );
+
+  await Promise.all(
+    weeklyPlansSnapshot.docs.map((document) => deleteDoc(document.ref)),
+  );
+
+  const somedayGoalsSnapshot = await getDocs(
+    collection(db, 'users', userId, 'somedayGoals'),
+  );
+
+  await Promise.all(
+    somedayGoalsSnapshot.docs.map((document) => deleteDoc(document.ref)),
+  );
+
+  await deleteDoc(doc(db, 'users', userId));
+}
+
 export function nowTimestamp() {
   return Timestamp.now();
 }

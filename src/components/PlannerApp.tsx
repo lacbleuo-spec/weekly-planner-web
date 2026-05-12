@@ -1,6 +1,9 @@
+// PlannerApp
+
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { PlannerResponsiveLayout } from '@/components/PlannerResponsiveLayout';
 import { Timestamp } from 'firebase/firestore';
 import {
   Check,
@@ -34,6 +37,7 @@ import {
   fetchWeeklyPlans,
   replaceCloudSomedayGoals,
   replaceCloudWeeklyPlans,
+  deleteCloudUserData,
 } from '@/services/plannerService';
 import {
   FirebaseDailyGoal,
@@ -149,6 +153,31 @@ export default function PlannerApp() {
     }
   }, [auth.user?.uid]);
 
+  useEffect(() => {
+    function syncExpandedDaysForScreenSize() {
+      const isDesktop = window.matchMedia('(min-width: 1280px)').matches;
+
+      if (isDesktop) {
+        setExpandedDayKeys(new Set(weekDates.map(dayKey)));
+        return;
+      }
+
+      if (weekDates.some((date) => isSameDay(date, new Date()))) {
+        setExpandedDayKeys(new Set([dayKey(new Date())]));
+      } else {
+        setExpandedDayKeys(new Set());
+      }
+    }
+
+    syncExpandedDaysForScreenSize();
+
+    window.addEventListener('resize', syncExpandedDaysForScreenSize);
+
+    return () => {
+      window.removeEventListener('resize', syncExpandedDaysForScreenSize);
+    };
+  }, [weekDates]);
+
   async function downloadFromCloud() {
     if (!auth.user) return;
 
@@ -225,6 +254,12 @@ export default function PlannerApp() {
     setSelectedWeekStartDate(next);
 
     const dates = Array.from({ length: 7 }, (_, i) => addingDays(next, i));
+    const isDesktop = window.matchMedia('(min-width: 1280px)').matches;
+
+    if (isDesktop) {
+      setExpandedDayKeys(new Set(dates.map(dayKey)));
+      return;
+    }
 
     if (dates.some((date) => isSameDay(date, new Date()))) {
       setExpandedDayKeys(new Set([dayKey(new Date())]));
@@ -459,202 +494,210 @@ export default function PlannerApp() {
 
   return (
     <main className='min-h-screen bg-[#f2f2f7] text-black'>
-      <div className='mx-auto max-w-2xl space-y-5 p-5'>
-        <Card>
-          <div className='flex items-center justify-between gap-4'>
-            <div className='min-w-0'>
-              <h2 className='text-[17px] font-semibold'>
-                {auth.isLoggedIn ? 'Cloud connected' : 'Not synced'}
-              </h2>
+      <PlannerResponsiveLayout
+        weekDates={weekDates}
+        globalSidebar={
+          <>
+            <Card>
+              <div className='flex items-center justify-between gap-4'>
+                <div className='min-w-0'>
+                  <h2 className='text-[17px] font-semibold'>
+                    {auth.isLoggedIn ? 'Cloud connected' : 'Not synced'}
+                  </h2>
 
-              <p className='mt-0.5 truncate text-[12px] text-gray-500'>
-                {auth.user?.email ?? 'Log in to use cloud backup'}
-              </p>
-            </div>
+                  <p className='mt-0.5 truncate text-[12px] text-gray-500'>
+                    {auth.user?.email ?? 'Log in to use cloud backup'}
+                  </p>
+                </div>
 
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className='flex items-center gap-1.5 text-[15px] font-semibold text-blue-500'
-            >
-              <CloudIcon
-                size={18}
-                fill={auth.isLoggedIn ? 'currentColor' : 'none'}
-              />
-              {auth.isLoggedIn ? 'Sync' : 'Login'}
-            </button>
-          </div>
-        </Card>
-
-        <ExpandableCard
-          title='Someday Goals'
-          subtitle={`${visibleSomedayGoals.length} goals`}
-          expanded={isSomedayExpanded}
-          onToggle={() => setIsSomedayExpanded((prev) => !prev)}
-        >
-          {visibleSomedayGoals.length === 0 && (
-            <EmptyText>
-              Write down things you'd like to do someday, even if not right now
-            </EmptyText>
-          )}
-
-          {visibleSomedayGoals.map((goal) => (
-            <GoalRow
-              key={goal.id}
-              title={goal.title}
-              onMove={(direction) => moveSomedayGoal(goal.id, direction)}
-              onDelete={() => deleteSomedayGoal(goal.id)}
-            />
-          ))}
-
-          <AddInput
-            value={newSomedayGoalText}
-            onChange={setNewSomedayGoalText}
-            placeholder='+ Add someday goal'
-            onSubmit={addSomedayGoal}
-          />
-        </ExpandableCard>
-
-        <div className='flex items-center justify-between'>
-          <button
-            onClick={() => moveWeek(-7)}
-            className='flex h-10 w-10 items-center justify-center rounded-full bg-white'
-          >
-            <ChevronLeft size={22} strokeWidth={2.4} />
-          </button>
-
-          <p className='text-center text-[14px] text-gray-500'>
-            {monthDayText(selectedWeekStartDate)} (
-            {weekdayShort(selectedWeekStartDate)}) -{' '}
-            {monthDayText(selectedWeekEndDate)} (
-            {weekdayShort(selectedWeekEndDate)})
-          </p>
-
-          <button
-            onClick={() => moveWeek(7)}
-            className='flex h-10 w-10 items-center justify-center rounded-full bg-white'
-          >
-            <ChevronRight size={22} strokeWidth={2.4} />
-          </button>
-        </div>
-
-        <Card>
-          <div className='flex items-end justify-between'>
-            <div>
-              <h2 className='text-[17px] font-semibold'>Overall Progress</h2>
-              <p className='mt-1 text-[15px] text-gray-500'>
-                {completedCount} / {allGoals.length} completed
-              </p>
-            </div>
-
-            <p className='text-[34px] font-bold leading-none text-blue-500'>
-              {Math.round(progress * 100)}%
-            </p>
-          </div>
-
-          <div className='mt-4 h-3 overflow-hidden rounded-full bg-gray-200'>
-            <div
-              className='h-full rounded-full bg-blue-500 transition-all'
-              style={{ width: `${progress * 100}%` }}
-            />
-          </div>
-        </Card>
-
-        <ExpandableCard
-          title='Weekly Goals'
-          subtitle={`${weeklyGoals.length} goals`}
-          expanded={isWeeklyExpanded}
-          onToggle={() => setIsWeeklyExpanded((prev) => !prev)}
-        >
-          {weeklyGoals.length === 0 && (
-            <EmptyText>Add your goals for this week</EmptyText>
-          )}
-
-          {weeklyGoals.map((goal) => (
-            <GoalRow
-              key={goal.id}
-              title={goal.title}
-              showCopy
-              onMove={(direction) => moveWeeklyGoal(goal.id, direction)}
-              onDelete={() => deleteWeeklyGoal(goal.id)}
-            />
-          ))}
-
-          <AddInput
-            value={newWeeklyGoalText}
-            onChange={setNewWeeklyGoalText}
-            placeholder='+ Add weekly goal'
-            onSubmit={addWeeklyGoal}
-          />
-        </ExpandableCard>
-
-        <div className='space-y-3.5'>
-          {weekDates.map((date) => {
-            const key = dayKey(date);
-            const goals = goalsForDate(date);
-            const isExpanded = expandedDayKeys.has(key);
-            const done = goals.filter((goal) => goal.isCompleted).length;
-
-            return (
-              <Card key={key}>
                 <button
-                  onClick={() => toggleDay(date)}
-                  className='flex w-full items-center justify-between'
+                  onClick={() => setShowAuthModal(true)}
+                  className='flex items-center gap-1.5 text-[15px] font-semibold text-blue-500'
                 >
-                  <div className='text-left'>
-                    <h2 className='text-[17px] font-semibold'>
-                      {englishWeekdayText(date)}
-                    </h2>
-                    <p className='mt-1 text-[12px] text-gray-500'>
-                      {monthDayText(date)}
-                    </p>
-                  </div>
-
-                  <div className='flex items-center gap-3'>
-                    <p className='text-[15px] font-semibold text-gray-500'>
-                      {done}/{goals.length}
-                    </p>
-
-                    {isExpanded ? (
-                      <ChevronUp size={18} className='text-gray-500' />
-                    ) : (
-                      <ChevronDown size={18} className='text-gray-500' />
-                    )}
-                  </div>
+                  <CloudIcon
+                    size={18}
+                    fill={auth.isLoggedIn ? 'currentColor' : 'none'}
+                  />
+                  {auth.isLoggedIn ? 'Sync' : 'Login'}
                 </button>
+              </div>
+            </Card>
 
-                {isExpanded && (
-                  <div className='mt-4 space-y-2.5'>
-                    {goals.length === 0 && (
-                      <EmptyText>Add goals for this day</EmptyText>
-                    )}
+            <ExpandableCard
+              title='Someday Goals'
+              subtitle={`${visibleSomedayGoals.length} goals`}
+              expanded={isSomedayExpanded}
+              onToggle={() => setIsSomedayExpanded((prev) => !prev)}
+            >
+              {visibleSomedayGoals.length === 0 && (
+                <EmptyText>
+                  Write down things you'd like to do someday, even if not right
+                  now
+                </EmptyText>
+              )}
 
-                    {goals.map((goal) => (
-                      <DailyGoalRow
-                        key={goal.id}
-                        goal={goal}
-                        onToggle={() => toggleDailyGoal(goal.id)}
-                        onMove={(direction) =>
-                          moveDailyGoal(goal.id, date, direction)
-                        }
-                        onDelete={() => deleteDailyGoal(goal.id)}
-                      />
-                    ))}
+              {visibleSomedayGoals.map((goal) => (
+                <GoalRow
+                  key={goal.id}
+                  title={goal.title}
+                  onMove={(direction) => moveSomedayGoal(goal.id, direction)}
+                  onDelete={() => deleteSomedayGoal(goal.id)}
+                />
+              ))}
 
-                    <AddInput
-                      value={newGoalTexts[key] ?? ''}
-                      onChange={(value) =>
-                        setNewGoalTexts((prev) => ({ ...prev, [key]: value }))
+              <AddInput
+                value={newSomedayGoalText}
+                onChange={setNewSomedayGoalText}
+                placeholder='+ Add someday goal'
+                onSubmit={addSomedayGoal}
+              />
+            </ExpandableCard>
+          </>
+        }
+        weekSidebar={
+          <>
+            <div className='flex items-center justify-between'>
+              <button
+                onClick={() => moveWeek(-7)}
+                className='flex h-10 w-10 items-center justify-center rounded-full bg-white'
+              >
+                <ChevronLeft size={22} strokeWidth={2.4} />
+              </button>
+
+              <p className='text-center text-[14px] text-gray-500'>
+                {monthDayText(selectedWeekStartDate)} (
+                {weekdayShort(selectedWeekStartDate)}) -{' '}
+                {monthDayText(selectedWeekEndDate)} (
+                {weekdayShort(selectedWeekEndDate)})
+              </p>
+
+              <button
+                onClick={() => moveWeek(7)}
+                className='flex h-10 w-10 items-center justify-center rounded-full bg-white'
+              >
+                <ChevronRight size={22} strokeWidth={2.4} />
+              </button>
+            </div>
+
+            <Card>
+              <div className='flex items-end justify-between'>
+                <div>
+                  <h2 className='text-[17px] font-semibold'>
+                    Overall Progress
+                  </h2>
+                  <p className='mt-1 text-[15px] text-gray-500'>
+                    {completedCount} / {allGoals.length} completed
+                  </p>
+                </div>
+
+                <p className='text-[34px] font-bold leading-none text-blue-500'>
+                  {Math.round(progress * 100)}%
+                </p>
+              </div>
+
+              <div className='mt-4 h-3 overflow-hidden rounded-full bg-gray-200'>
+                <div
+                  className='h-full rounded-full bg-blue-500 transition-all'
+                  style={{ width: `${progress * 100}%` }}
+                />
+              </div>
+            </Card>
+
+            <ExpandableCard
+              title='Weekly Goals'
+              subtitle={`${weeklyGoals.length} goals`}
+              expanded={isWeeklyExpanded}
+              onToggle={() => setIsWeeklyExpanded((prev) => !prev)}
+            >
+              {weeklyGoals.length === 0 && (
+                <EmptyText>Add your goals for this week</EmptyText>
+              )}
+
+              {weeklyGoals.map((goal) => (
+                <GoalRow
+                  key={goal.id}
+                  title={goal.title}
+                  showCopy
+                  onMove={(direction) => moveWeeklyGoal(goal.id, direction)}
+                  onDelete={() => deleteWeeklyGoal(goal.id)}
+                />
+              ))}
+
+              <AddInput
+                value={newWeeklyGoalText}
+                onChange={setNewWeeklyGoalText}
+                placeholder='+ Add weekly goal'
+                onSubmit={addWeeklyGoal}
+              />
+            </ExpandableCard>
+          </>
+        }
+        renderDay={(date) => {
+          const key = dayKey(date);
+          const goals = goalsForDate(date);
+          const isExpanded = expandedDayKeys.has(key);
+          const done = goals.filter((goal) => goal.isCompleted).length;
+
+          return (
+            <Card>
+              <button
+                onClick={() => toggleDay(date)}
+                className='flex w-full items-center justify-between'
+              >
+                <div className='text-left'>
+                  <h2 className='text-[17px] font-semibold'>
+                    {englishWeekdayText(date)}
+                  </h2>
+                  <p className='mt-1 text-[12px] text-gray-500'>
+                    {monthDayText(date)}
+                  </p>
+                </div>
+
+                <div className='flex items-center gap-3'>
+                  <p className='text-[15px] font-semibold text-gray-500'>
+                    {done}/{goals.length}
+                  </p>
+
+                  {isExpanded ? (
+                    <ChevronUp size={18} className='text-gray-500' />
+                  ) : (
+                    <ChevronDown size={18} className='text-gray-500' />
+                  )}
+                </div>
+              </button>
+
+              {isExpanded && (
+                <div className='mt-4 space-y-2.5'>
+                  {goals.length === 0 && (
+                    <EmptyText>Add goals for this day</EmptyText>
+                  )}
+
+                  {goals.map((goal) => (
+                    <DailyGoalRow
+                      key={goal.id}
+                      goal={goal}
+                      onToggle={() => toggleDailyGoal(goal.id)}
+                      onMove={(direction) =>
+                        moveDailyGoal(goal.id, date, direction)
                       }
-                      placeholder={`+ Add ${englishWeekdayText(date)} goal`}
-                      onSubmit={() => addDailyGoal(date)}
+                      onDelete={() => deleteDailyGoal(goal.id)}
                     />
-                  </div>
-                )}
-              </Card>
-            );
-          })}
-        </div>
-      </div>
+                  ))}
+
+                  <AddInput
+                    value={newGoalTexts[key] ?? ''}
+                    onChange={(value) =>
+                      setNewGoalTexts((prev) => ({ ...prev, [key]: value }))
+                    }
+                    placeholder={`+ Add ${englishWeekdayText(date)} goal`}
+                    onSubmit={() => addDailyGoal(date)}
+                  />
+                </div>
+              )}
+            </Card>
+          );
+        }}
+      />
 
       {showAuthModal && (
         <AuthModal
@@ -663,6 +706,12 @@ export default function PlannerApp() {
           lastSyncedAt={lastSyncedAt}
           onUpload={uploadToCloud}
           onDownload={downloadFromCloud}
+          onDeleteLocalData={() => {
+            setWeeklyPlans([]);
+            setSomedayGoals([]);
+            setLastSyncedAt(null);
+            setSyncError(null);
+          }}
           onClose={() => setShowAuthModal(false)}
         />
       )}
@@ -731,6 +780,7 @@ function AddInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing) return;
           if (e.key === 'Enter') onSubmit();
         }}
         placeholder={placeholder}
@@ -882,6 +932,7 @@ function AuthModal({
   lastSyncedAt,
   onUpload,
   onDownload,
+  onDeleteLocalData,
   onClose,
 }: {
   auth: ReturnType<typeof useAuth>;
@@ -889,6 +940,7 @@ function AuthModal({
   lastSyncedAt: Date | null;
   onUpload: () => Promise<void>;
   onDownload: () => Promise<void>;
+  onDeleteLocalData: () => void;
   onClose: () => void;
 }) {
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
@@ -898,20 +950,25 @@ function AuthModal({
 
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   async function submit() {
-    if (isCreatingAccount) {
-      if (password !== confirmPassword) {
-        auth.setErrorMessage('Passwords do not match.');
-        return;
+    try {
+      if (isCreatingAccount) {
+        if (password !== confirmPassword) {
+          auth.setErrorMessage('Passwords do not match.');
+          return;
+        }
+
+        await auth.signUp(email, password);
+      } else {
+        await auth.signIn(email, password);
       }
 
-      await auth.signUp(email, password);
-    } else {
-      await auth.signIn(email, password);
+      onClose();
+    } catch {
+      // useAuth에서 errorMessage 처리
     }
-
-    onClose();
   }
 
   async function confirmDownload() {
@@ -940,10 +997,62 @@ function AuthModal({
     }
   }
 
+  async function signOutAndClearLocalData() {
+    onDeleteLocalData();
+    await auth.signOut();
+    onClose();
+  }
+
+  async function confirmDeleteAccount() {
+    const confirmed = window.confirm(
+      'This permanently deletes your account and cloud backup data. This action cannot be undone.',
+    );
+
+    if (!confirmed) return;
+
+    const reauthPassword = window.prompt(
+      'For security, please re-enter your password.',
+    );
+
+    if (reauthPassword === null) return;
+
+    if (!reauthPassword.trim()) {
+      auth.setErrorMessage('Please enter your password.');
+      return;
+    }
+
+    if (!auth.user) {
+      auth.setErrorMessage('No signed-in user found.');
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    auth.setErrorMessage(null);
+
+    try {
+      await deleteCloudUserData(auth.user.uid);
+      onDeleteLocalData();
+      await auth.reauthenticateAndDelete(reauthPassword);
+      onClose();
+    } catch {
+      // useAuth에서 errorMessage 처리
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  }
+
   if (auth.isLoggedIn) {
     return (
-      <div className='fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4'>
-        <div className='w-full max-w-md rounded-[24px] bg-white p-6'>
+      <div
+        onClick={() => {
+          if (!isDeletingAccount) onClose();
+        }}
+        className='fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4'
+      >
+        <div
+          onClick={(event) => event.stopPropagation()}
+          className='w-full max-w-md rounded-[24px] bg-white p-6'
+        >
           <div className='space-y-4 text-center'>
             <Cloud
               size={48}
@@ -956,7 +1065,7 @@ function AuthModal({
 
             <button
               onClick={confirmDownload}
-              disabled={isUploading || isDownloading}
+              disabled={isUploading || isDownloading || isDeletingAccount}
               className='w-full rounded-[16px] bg-blue-500 p-4 font-semibold text-white disabled:opacity-50'
             >
               {isDownloading ? 'Working...' : 'Download from Cloud'}
@@ -964,14 +1073,16 @@ function AuthModal({
 
             <button
               onClick={confirmUpload}
-              disabled={isUploading || isDownloading}
+              disabled={isUploading || isDownloading || isDeletingAccount}
               className='w-full rounded-[16px] bg-blue-500 p-4 font-semibold text-white disabled:opacity-50'
             >
               {isUploading ? 'Working...' : 'Upload to Cloud'}
             </button>
 
-            {syncError && (
-              <p className='text-[13px] text-red-500'>{syncError}</p>
+            {(syncError || auth.errorMessage) && (
+              <p className='text-[13px] text-red-500'>
+                {syncError ?? auth.errorMessage}
+              </p>
             )}
 
             {lastSyncedAt && (
@@ -985,21 +1096,20 @@ function AuthModal({
             )}
 
             <button
-              onClick={async () => {
-                await auth.signOut();
-                onClose();
-              }}
-              className='inline-flex items-center justify-center gap-1 text-red-500'
+              onClick={signOutAndClearLocalData}
+              disabled={isDeletingAccount}
+              className='inline-flex items-center justify-center gap-1 text-red-500 disabled:opacity-50'
             >
               <LogOut size={16} />
               Sign Out
             </button>
 
             <button
-              onClick={onClose}
-              className='block w-full text-[14px] text-gray-400'
+              onClick={confirmDeleteAccount}
+              disabled={isUploading || isDownloading || isDeletingAccount}
+              className='block w-full py-2 text-[13px] text-gray-300 disabled:opacity-50'
             >
-              Cancel
+              {isDeletingAccount ? 'Deleting Account...' : 'Delete Account'}
             </button>
           </div>
         </div>
@@ -1008,8 +1118,14 @@ function AuthModal({
   }
 
   return (
-    <div className='fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4'>
-      <div className='w-full max-w-md rounded-[24px] bg-white p-6'>
+    <div
+      onClick={onClose}
+      className='fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4'
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        className='w-full max-w-md rounded-[24px] bg-white p-6'
+      >
         <div className='space-y-4'>
           <h2 className='text-center text-[22px] font-bold'>
             {isCreatingAccount ? 'Create Account' : 'Login'}
@@ -1072,13 +1188,6 @@ function AuthModal({
             {isCreatingAccount
               ? 'Already have an account? Log in'
               : 'New here? Create account'}
-          </button>
-
-          <button
-            onClick={onClose}
-            className='w-full text-[14px] text-gray-400'
-          >
-            Cancel
           </button>
         </div>
       </div>
