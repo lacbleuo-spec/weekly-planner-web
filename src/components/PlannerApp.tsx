@@ -16,9 +16,9 @@ import {
   Cloud,
   CloudIcon,
   Copy,
-  GripHorizontal,
   LogOut,
   Plus,
+  Smartphone,
   Trash2,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -47,6 +47,66 @@ import {
 } from '@/models/planner';
 
 const REORDER_THRESHOLD = 42;
+const LOCAL_STORAGE_KEY = 'weekly-planner-local-data-v1';
+const IOS_APP_STORE_URL =
+  'https://apps.apple.com/kr/app/weekly-goal-based-planner/id6764600765';
+
+type StoredTimestamp = {
+  seconds: number;
+  nanoseconds: number;
+};
+
+type StoredWeeklyGoal = Omit<
+  FirebaseWeeklyGoal,
+  'createdAt' | 'updatedAt' | 'deletedAt'
+> & {
+  createdAt: StoredTimestamp;
+  updatedAt?: StoredTimestamp | null;
+  deletedAt?: StoredTimestamp | null;
+};
+
+type StoredDailyGoal = Omit<
+  FirebaseDailyGoal,
+  'date' | 'createdAt' | 'updatedAt' | 'deletedAt'
+> & {
+  date: StoredTimestamp;
+  createdAt: StoredTimestamp;
+  updatedAt?: StoredTimestamp | null;
+  deletedAt?: StoredTimestamp | null;
+};
+
+type StoredSomedayGoal = Omit<
+  FirebaseSomedayGoal,
+  'createdAt' | 'updatedAt' | 'deletedAt'
+> & {
+  createdAt: StoredTimestamp;
+  updatedAt?: StoredTimestamp | null;
+  deletedAt?: StoredTimestamp | null;
+};
+
+type StoredWeeklyPlan = Omit<
+  FirebaseWeeklyPlan,
+  | 'weekStartDate'
+  | 'weekEndDate'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'deletedAt'
+  | 'weeklyGoals'
+  | 'dailyGoals'
+> & {
+  weekStartDate: StoredTimestamp;
+  weekEndDate: StoredTimestamp;
+  createdAt: StoredTimestamp;
+  updatedAt?: StoredTimestamp | null;
+  deletedAt?: StoredTimestamp | null;
+  weeklyGoals: StoredWeeklyGoal[];
+  dailyGoals: StoredDailyGoal[];
+};
+
+type StoredPlannerData = {
+  weeklyPlans: StoredWeeklyPlan[];
+  somedayGoals: StoredSomedayGoal[];
+};
 
 function makeId() {
   return crypto.randomUUID();
@@ -54,6 +114,93 @@ function makeId() {
 
 function now() {
   return Timestamp.now();
+}
+
+function storeTimestamp(timestamp?: Timestamp | null): StoredTimestamp | null {
+  if (!timestamp) return null;
+
+  return {
+    seconds: timestamp.seconds,
+    nanoseconds: timestamp.nanoseconds,
+  };
+}
+
+function restoreTimestamp(
+  timestamp?: StoredTimestamp | null,
+): Timestamp | null {
+  if (!timestamp) return null;
+
+  return new Timestamp(timestamp.seconds, timestamp.nanoseconds);
+}
+
+function storePlannerData(
+  weeklyPlans: FirebaseWeeklyPlan[],
+  somedayGoals: FirebaseSomedayGoal[],
+): StoredPlannerData {
+  return {
+    weeklyPlans: weeklyPlans.map((plan) => ({
+      ...plan,
+      weekStartDate: storeTimestamp(plan.weekStartDate)!,
+      weekEndDate: storeTimestamp(plan.weekEndDate)!,
+      createdAt: storeTimestamp(plan.createdAt)!,
+      updatedAt: storeTimestamp(plan.updatedAt),
+      deletedAt: storeTimestamp(plan.deletedAt),
+      weeklyGoals: plan.weeklyGoals.map((goal) => ({
+        ...goal,
+        createdAt: storeTimestamp(goal.createdAt)!,
+        updatedAt: storeTimestamp(goal.updatedAt),
+        deletedAt: storeTimestamp(goal.deletedAt),
+      })),
+      dailyGoals: plan.dailyGoals.map((goal) => ({
+        ...goal,
+        date: storeTimestamp(goal.date)!,
+        createdAt: storeTimestamp(goal.createdAt)!,
+        updatedAt: storeTimestamp(goal.updatedAt),
+        deletedAt: storeTimestamp(goal.deletedAt),
+      })),
+    })),
+    somedayGoals: somedayGoals.map((goal) => ({
+      ...goal,
+      createdAt: storeTimestamp(goal.createdAt)!,
+      updatedAt: storeTimestamp(goal.updatedAt),
+      deletedAt: storeTimestamp(goal.deletedAt),
+    })),
+  };
+}
+
+function restorePlannerData(data: StoredPlannerData): {
+  weeklyPlans: FirebaseWeeklyPlan[];
+  somedayGoals: FirebaseSomedayGoal[];
+} {
+  return {
+    weeklyPlans: (data.weeklyPlans ?? []).map((plan) => ({
+      ...plan,
+      weekStartDate: restoreTimestamp(plan.weekStartDate)!,
+      weekEndDate: restoreTimestamp(plan.weekEndDate)!,
+      createdAt: restoreTimestamp(plan.createdAt)!,
+      updatedAt: restoreTimestamp(plan.updatedAt),
+      deletedAt: restoreTimestamp(plan.deletedAt),
+      weeklyGoals: (plan.weeklyGoals ?? []).map((goal) => ({
+        ...goal,
+        createdAt: restoreTimestamp(goal.createdAt)!,
+        updatedAt: restoreTimestamp(goal.updatedAt),
+        deletedAt: restoreTimestamp(goal.deletedAt),
+      })),
+      dailyGoals: (plan.dailyGoals ?? []).map((goal) => ({
+        ...goal,
+        date: restoreTimestamp(goal.date)!,
+        createdAt: restoreTimestamp(goal.createdAt)!,
+        updatedAt: restoreTimestamp(goal.updatedAt),
+        deletedAt: restoreTimestamp(goal.deletedAt),
+      })),
+    })),
+    somedayGoals: (data.somedayGoals ?? []).map((goal) => ({
+      ...goal,
+      createdAt: restoreTimestamp(goal.createdAt)!,
+      updatedAt: restoreTimestamp(goal.updatedAt),
+      deletedAt: restoreTimestamp(goal.deletedAt),
+    })),
+  };
 }
 
 function upsertPlan(
@@ -84,6 +231,7 @@ export default function PlannerApp() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [hasLoadedLocalData, setHasLoadedLocalData] = useState(false);
 
   const [selectedWeekStartDate, setSelectedWeekStartDate] = useState(
     startOfWeek(new Date()),
@@ -101,6 +249,42 @@ export default function PlannerApp() {
   const [expandedDayKeys, setExpandedDayKeys] = useState<Set<string>>(
     new Set([dayKey(new Date())]),
   );
+
+  useEffect(() => {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+
+    if (raw) {
+      try {
+        const restoredData = restorePlannerData(
+          JSON.parse(raw) as StoredPlannerData,
+        );
+
+        setWeeklyPlans(restoredData.weeklyPlans);
+        setSomedayGoals(restoredData.somedayGoals);
+      } catch {
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+      }
+    }
+
+    setHasLoadedLocalData(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedLocalData) return;
+    if (auth.isLoading) return;
+    if (!auth.user) return;
+
+    localStorage.setItem(
+      LOCAL_STORAGE_KEY,
+      JSON.stringify(storePlannerData(weeklyPlans, somedayGoals)),
+    );
+  }, [
+    hasLoadedLocalData,
+    auth.isLoading,
+    auth.user,
+    weeklyPlans,
+    somedayGoals,
+  ]);
 
   const selectedWeekEndDate = useMemo(
     () => endOfWeek(selectedWeekStartDate),
@@ -145,13 +329,16 @@ export default function PlannerApp() {
   }, [somedayGoals]);
 
   useEffect(() => {
+    if (auth.isLoading) return;
+
     if (!auth.user) {
       setWeeklyPlans([]);
       setSomedayGoals([]);
       setLastSyncedAt(null);
       setSyncError(null);
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
     }
-  }, [auth.user?.uid]);
+  }, [auth.isLoading, auth.user?.uid]);
 
   useEffect(() => {
     function syncExpandedDaysForScreenSize() {
@@ -498,6 +685,8 @@ export default function PlannerApp() {
         weekDates={weekDates}
         globalSidebar={
           <>
+            <MobileAppCard />
+
             <Card>
               <div className='flex items-center justify-between gap-4'>
                 <div className='min-w-0'>
@@ -711,6 +900,7 @@ export default function PlannerApp() {
             setSomedayGoals([]);
             setLastSyncedAt(null);
             setSyncError(null);
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
           }}
           onClose={() => setShowAuthModal(false)}
         />
@@ -721,6 +911,31 @@ export default function PlannerApp() {
 
 function Card({ children }: { children: React.ReactNode }) {
   return <section className='rounded-[24px] bg-white p-5'>{children}</section>;
+}
+
+function MobileAppCard() {
+  return (
+    <div className='space-y-2'>
+      <a
+        href={IOS_APP_STORE_URL}
+        target='_blank'
+        rel='noopener noreferrer'
+        className='flex items-center gap-2 text-[17px] font-semibold text-black active:scale-[0.98]'
+      >
+        <span className='w-5 text-center text-[18px] leading-none'></span>
+        iOS
+      </a>
+
+      <button
+        type='button'
+        disabled
+        className='flex items-center gap-2 text-[17px] font-semibold text-gray-400'
+      >
+        <Smartphone size={18} strokeWidth={2.2} className='w-5' />
+        Android
+      </button>
+    </div>
+  );
 }
 
 function ExpandableCard({
@@ -834,12 +1049,16 @@ function DragHandle({ onMove }: { onMove: (direction: number) => void }) {
       onPointerMove={handlePointerMove}
       onPointerUp={stopDragging}
       onPointerCancel={stopDragging}
-      className={`touch-none cursor-grab p-1 ${
-        isDragging ? 'scale-110 text-gray-500' : 'text-gray-300'
+      className={`flex h-8 w-8 touch-none cursor-grab items-center justify-center rounded-full transition-transform ${
+        isDragging ? 'scale-110' : ''
       }`}
       aria-label='Drag to reorder'
     >
-      <GripHorizontal size={22} />
+      <span className='flex flex-col items-center justify-center gap-[3px]'>
+        <span className='h-[1.5px] w-[17px] rounded-full bg-gray-400' />
+        <span className='h-[1.5px] w-[17px] rounded-full bg-gray-400' />
+        <span className='h-[1.5px] w-[17px] rounded-full bg-gray-400' />
+      </span>
     </button>
   );
 }
