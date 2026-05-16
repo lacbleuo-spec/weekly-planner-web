@@ -1,5 +1,3 @@
-// PlannerApp
-
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -32,11 +30,14 @@ import {
   weekdayShort,
 } from '@/lib/date';
 import {
-  fetchSomedayGoals,
-  fetchWeeklyPlans,
-  replaceCloudSomedayGoals,
-  replaceCloudWeeklyPlans,
   deleteCloudUserData,
+  saveDailyGoal,
+  saveDailyGoals,
+  saveSomedayGoal,
+  saveSomedayGoals,
+  saveWeeklyGoal,
+  saveWeeklyGoals,
+  subscribePlannerData,
 } from '@/services/plannerService';
 import {
   FirebaseDailyGoal,
@@ -215,15 +216,6 @@ function upsertPlan(
   return plans.map((plan) => (plan.id === updatedPlan.id ? updatedPlan : plan));
 }
 
-function activePlanForUpload(plan: FirebaseWeeklyPlan): FirebaseWeeklyPlan {
-  return {
-    ...plan,
-    deletedAt: null,
-    weeklyGoals: plan.weeklyGoals.filter((goal) => !goal.deletedAt),
-    dailyGoals: plan.dailyGoals.filter((goal) => !goal.deletedAt),
-  };
-}
-
 export default function PlannerApp() {
   const auth = useAuth();
 
@@ -288,6 +280,35 @@ export default function PlannerApp() {
     somedayGoals,
   ]);
 
+  useEffect(() => {
+    if (auth.isLoading) return;
+
+    if (!auth.user) {
+      setWeeklyPlans([]);
+      setSomedayGoals([]);
+      setLastSyncedAt(null);
+      setSyncError(null);
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      return;
+    }
+
+    setSyncError(null);
+
+    const unsubscribe = subscribePlannerData(
+      auth.user.uid,
+      (data) => {
+        setWeeklyPlans(data.weeklyPlans);
+        setSomedayGoals(data.somedayGoals);
+        setLastSyncedAt(new Date());
+      },
+      (error) => {
+        setSyncError(error.message);
+      },
+    );
+
+    return () => unsubscribe();
+  }, [auth.isLoading, auth.user?.uid]);
+
   const selectedWeekEndDate = useMemo(
     () => endOfWeek(selectedWeekStartDate),
     [selectedWeekStartDate],
@@ -331,18 +352,6 @@ export default function PlannerApp() {
   }, [somedayGoals]);
 
   useEffect(() => {
-    if (auth.isLoading) return;
-
-    if (!auth.user) {
-      setWeeklyPlans([]);
-      setSomedayGoals([]);
-      setLastSyncedAt(null);
-      setSyncError(null);
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
-    }
-  }, [auth.isLoading, auth.user?.uid]);
-
-  useEffect(() => {
     function syncExpandedDaysForScreenSize() {
       const isDesktop = window.matchMedia('(min-width: 1280px)').matches;
 
@@ -367,63 +376,15 @@ export default function PlannerApp() {
     };
   }, [weekDates]);
 
-  async function downloadFromCloud() {
-    if (!auth.user) return;
-
-    setSyncError(null);
-
-    try {
-      const [cloudPlans, cloudSomedayGoals] = await Promise.all([
-        fetchWeeklyPlans(auth.user.uid),
-        fetchSomedayGoals(auth.user.uid),
-      ]);
-
-      setWeeklyPlans(cloudPlans);
-      setSomedayGoals(cloudSomedayGoals);
-      setLastSyncedAt(new Date());
-    } catch (error) {
-      setSyncError(
-        error instanceof Error
-          ? error.message
-          : 'Failed to download cloud data.',
-      );
-    }
-  }
-
-  async function uploadToCloud() {
-    if (!auth.user) return;
-
-    setSyncError(null);
-
-    try {
-      const plansToUpload = weeklyPlans
-        .filter((plan) => !plan.deletedAt)
-        .map(activePlanForUpload);
-
-      const somedayGoalsToUpload = somedayGoals.filter(
-        (goal) => !goal.deletedAt,
-      );
-
-      await Promise.all([
-        replaceCloudWeeklyPlans(auth.user.uid, plansToUpload),
-        replaceCloudSomedayGoals(auth.user.uid, somedayGoalsToUpload),
-      ]);
-
-      setLastSyncedAt(new Date());
-    } catch (error) {
-      setSyncError(
-        error instanceof Error ? error.message : 'Failed to upload cloud data.',
-      );
-    }
-  }
-
   function makeCurrentWeekPlan(): FirebaseWeeklyPlan {
+    const createdAt = now();
+
     return {
-      id: makeId(),
+      id: dayKey(selectedWeekStartDate),
       weekStartDate: Timestamp.fromDate(selectedWeekStartDate),
       weekEndDate: Timestamp.fromDate(selectedWeekEndDate),
-      createdAt: now(),
-      updatedAt: now(),
+      createdAt,
+      updatedAt: createdAt,
       deletedAt: null,
       weeklyGoals: [],
       dailyGoals: [],
@@ -436,6 +397,116 @@ export default function PlannerApp() {
 
   function saveSomedayGoalsChange(updatedGoals: FirebaseSomedayGoal[]) {
     setSomedayGoals(updatedGoals);
+  }
+
+  async function syncWeeklyGoalChange(
+    updatedPlan: FirebaseWeeklyPlan,
+    goal: FirebaseWeeklyGoal,
+  ) {
+    savePlanChange(updatedPlan);
+
+    if (!auth.user) return;
+
+    try {
+      await saveWeeklyGoal(auth.user.uid, updatedPlan, goal);
+      setSyncError(null);
+    } catch (error) {
+      setSyncError(
+        error instanceof Error ? error.message : 'Failed to sync weekly goal.',
+      );
+    }
+  }
+
+  async function syncWeeklyGoalsChange(
+    updatedPlan: FirebaseWeeklyPlan,
+    goals: FirebaseWeeklyGoal[],
+  ) {
+    savePlanChange(updatedPlan);
+
+    if (!auth.user) return;
+
+    try {
+      await saveWeeklyGoals(auth.user.uid, updatedPlan, goals);
+      setSyncError(null);
+    } catch (error) {
+      setSyncError(
+        error instanceof Error ? error.message : 'Failed to sync weekly goals.',
+      );
+    }
+  }
+
+  async function syncDailyGoalChange(
+    updatedPlan: FirebaseWeeklyPlan,
+    goal: FirebaseDailyGoal,
+  ) {
+    savePlanChange(updatedPlan);
+
+    if (!auth.user) return;
+
+    try {
+      await saveDailyGoal(auth.user.uid, updatedPlan, goal);
+      setSyncError(null);
+    } catch (error) {
+      setSyncError(
+        error instanceof Error ? error.message : 'Failed to sync daily goal.',
+      );
+    }
+  }
+
+  async function syncDailyGoalsChange(
+    updatedPlan: FirebaseWeeklyPlan,
+    goals: FirebaseDailyGoal[],
+  ) {
+    savePlanChange(updatedPlan);
+
+    if (!auth.user) return;
+
+    try {
+      await saveDailyGoals(auth.user.uid, updatedPlan, goals);
+      setSyncError(null);
+    } catch (error) {
+      setSyncError(
+        error instanceof Error ? error.message : 'Failed to sync daily goals.',
+      );
+    }
+  }
+
+  async function syncSomedayGoalChange(
+    updatedGoals: FirebaseSomedayGoal[],
+    goal: FirebaseSomedayGoal,
+  ) {
+    saveSomedayGoalsChange(updatedGoals);
+
+    if (!auth.user) return;
+
+    try {
+      await saveSomedayGoal(auth.user.uid, goal);
+      setSyncError(null);
+    } catch (error) {
+      setSyncError(
+        error instanceof Error ? error.message : 'Failed to sync someday goal.',
+      );
+    }
+  }
+
+  async function syncSomedayGoalsChange(
+    updatedGoals: FirebaseSomedayGoal[],
+    changedGoals: FirebaseSomedayGoal[],
+  ) {
+    saveSomedayGoalsChange(updatedGoals);
+
+    if (!auth.user) return;
+
+    try {
+      await saveSomedayGoals(auth.user.uid, changedGoals);
+      setSyncError(null);
+    } catch (error) {
+      setSyncError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to sync someday goals.',
+      );
+    }
   }
 
   function syncExpandedDays(nextWeekStartDate: Date) {
@@ -482,7 +553,7 @@ export default function PlannerApp() {
     };
 
     setNewSomedayGoalText('');
-    saveSomedayGoalsChange([...somedayGoals, goal]);
+    syncSomedayGoalChange([...somedayGoals, goal], goal);
   }
 
   function deleteSomedayGoal(goalId: string) {
@@ -490,10 +561,11 @@ export default function PlannerApp() {
     if (!target) return;
 
     const deletedGoal = { ...target, deletedAt: now(), updatedAt: now() };
-
-    saveSomedayGoalsChange(
-      somedayGoals.map((goal) => (goal.id === goalId ? deletedGoal : goal)),
+    const nextGoals = somedayGoals.map((goal) =>
+      goal.id === goalId ? deletedGoal : goal,
     );
+
+    syncSomedayGoalChange(nextGoals, deletedGoal);
   }
 
   function moveSomedayGoal(goalId: string, direction: number) {
@@ -515,7 +587,7 @@ export default function PlannerApp() {
       (goal) => reorderedGoals.find((g) => g.id === goal.id) ?? goal,
     );
 
-    saveSomedayGoalsChange(nextGoals);
+    syncSomedayGoalsChange(nextGoals, reorderedGoals);
   }
 
   function addWeeklyGoal() {
@@ -540,23 +612,28 @@ export default function PlannerApp() {
     };
 
     setNewWeeklyGoalText('');
-    savePlanChange(updatedPlan);
+    syncWeeklyGoalChange(updatedPlan, goal);
   }
 
   function deleteWeeklyGoal(goalId: string) {
     if (!currentPlan) return;
 
+    const deletedGoal = currentPlan.weeklyGoals.find(
+      (goal) => goal.id === goalId,
+    );
+    if (!deletedGoal) return;
+
+    const updatedGoal = { ...deletedGoal, deletedAt: now(), updatedAt: now() };
+
     const updatedPlan = {
       ...currentPlan,
       updatedAt: now(),
       weeklyGoals: currentPlan.weeklyGoals.map((goal) =>
-        goal.id === goalId
-          ? { ...goal, deletedAt: now(), updatedAt: now() }
-          : goal,
+        goal.id === goalId ? updatedGoal : goal,
       ),
     };
 
-    savePlanChange(updatedPlan);
+    syncWeeklyGoalChange(updatedPlan, updatedGoal);
   }
 
   function moveWeeklyGoal(goalId: string, direction: number) {
@@ -584,7 +661,7 @@ export default function PlannerApp() {
       ),
     };
 
-    savePlanChange(updatedPlan);
+    syncWeeklyGoalsChange(updatedPlan, reorderedGoals);
   }
 
   function goalsForDate(date: Date) {
@@ -618,39 +695,53 @@ export default function PlannerApp() {
     };
 
     setNewGoalTexts((prev) => ({ ...prev, [key]: '' }));
-    savePlanChange(updatedPlan);
+    syncDailyGoalChange(updatedPlan, goal);
   }
 
   function toggleDailyGoal(goalId: string) {
     if (!currentPlan) return;
 
+    const targetGoal = currentPlan.dailyGoals.find(
+      (goal) => goal.id === goalId,
+    );
+    if (!targetGoal) return;
+
+    const updatedGoal = {
+      ...targetGoal,
+      isCompleted: !targetGoal.isCompleted,
+      updatedAt: now(),
+    };
+
     const updatedPlan = {
       ...currentPlan,
       updatedAt: now(),
       dailyGoals: currentPlan.dailyGoals.map((goal) =>
-        goal.id === goalId
-          ? { ...goal, isCompleted: !goal.isCompleted, updatedAt: now() }
-          : goal,
+        goal.id === goalId ? updatedGoal : goal,
       ),
     };
 
-    savePlanChange(updatedPlan);
+    syncDailyGoalChange(updatedPlan, updatedGoal);
   }
 
   function deleteDailyGoal(goalId: string) {
     if (!currentPlan) return;
 
+    const targetGoal = currentPlan.dailyGoals.find(
+      (goal) => goal.id === goalId,
+    );
+    if (!targetGoal) return;
+
+    const deletedGoal = { ...targetGoal, deletedAt: now(), updatedAt: now() };
+
     const updatedPlan = {
       ...currentPlan,
       updatedAt: now(),
       dailyGoals: currentPlan.dailyGoals.map((goal) =>
-        goal.id === goalId
-          ? { ...goal, deletedAt: now(), updatedAt: now() }
-          : goal,
+        goal.id === goalId ? deletedGoal : goal,
       ),
     };
 
-    savePlanChange(updatedPlan);
+    syncDailyGoalChange(updatedPlan, deletedGoal);
   }
 
   function moveDailyGoal(goalId: string, date: Date, direction: number) {
@@ -678,7 +769,7 @@ export default function PlannerApp() {
       ),
     };
 
-    savePlanChange(updatedPlan);
+    syncDailyGoalsChange(updatedPlan, reorderedGoals);
   }
 
   function toggleDay(date: Date) {
@@ -708,7 +799,7 @@ export default function PlannerApp() {
                   </h2>
 
                   <p className='mt-0.5 truncate text-[12px] text-gray-500'>
-                    {auth.user?.email ?? 'Log in to use cloud backup'}
+                    {auth.user?.email ?? 'Log in to sync across devices'}
                   </p>
                 </div>
 
@@ -881,8 +972,6 @@ export default function PlannerApp() {
           auth={auth}
           syncError={syncError}
           lastSyncedAt={lastSyncedAt}
-          onUpload={uploadToCloud}
-          onDownload={downloadFromCloud}
           onDeleteLocalData={() => {
             setWeeklyPlans([]);
             setSomedayGoals([]);
@@ -1354,16 +1443,12 @@ function AuthModal({
   auth,
   syncError,
   lastSyncedAt,
-  onUpload,
-  onDownload,
   onDeleteLocalData,
   onClose,
 }: {
   auth: ReturnType<typeof useAuth>;
   syncError: string | null;
   lastSyncedAt: Date | null;
-  onUpload: () => Promise<void>;
-  onDownload: () => Promise<void>;
   onDeleteLocalData: () => void;
   onClose: () => void;
 }) {
@@ -1372,8 +1457,6 @@ function AuthModal({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const [isUploading, setIsUploading] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   async function submit() {
@@ -1391,33 +1474,7 @@ function AuthModal({
 
       onClose();
     } catch {
-      // useAuth에서 errorMessage 처리
-    }
-  }
-
-  async function confirmDownload() {
-    const confirmed = window.confirm("Download replaces this device's data.");
-    if (!confirmed) return;
-
-    setIsDownloading(true);
-
-    try {
-      await onDownload();
-    } finally {
-      setIsDownloading(false);
-    }
-  }
-
-  async function confirmUpload() {
-    const confirmed = window.confirm('Upload replaces cloud data.');
-    if (!confirmed) return;
-
-    setIsUploading(true);
-
-    try {
-      await onUpload();
-    } finally {
-      setIsUploading(false);
+      // useAuth handles errorMessage.
     }
   }
 
@@ -1429,7 +1486,7 @@ function AuthModal({
 
   async function confirmDeleteAccount() {
     const confirmed = window.confirm(
-      'This permanently deletes your account and cloud backup data. This action cannot be undone.',
+      'This permanently deletes your account and cloud data. This action cannot be undone.',
     );
 
     if (!confirmed) return;
@@ -1459,7 +1516,7 @@ function AuthModal({
       await auth.reauthenticateAndDelete(reauthPassword);
       onClose();
     } catch {
-      // useAuth에서 errorMessage 처리
+      // useAuth handles errorMessage.
     } finally {
       setIsDeletingAccount(false);
     }
@@ -1486,22 +1543,9 @@ function AuthModal({
 
             <h2 className='text-[22px] font-bold'>Signed in</h2>
             <p className='text-[14px] text-gray-500'>{auth.user?.email}</p>
-
-            <button
-              onClick={confirmDownload}
-              disabled={isUploading || isDownloading || isDeletingAccount}
-              className='w-full rounded-[16px] bg-blue-500 p-4 font-semibold text-white disabled:opacity-50'
-            >
-              {isDownloading ? 'Working...' : 'Download from Cloud'}
-            </button>
-
-            <button
-              onClick={confirmUpload}
-              disabled={isUploading || isDownloading || isDeletingAccount}
-              className='w-full rounded-[16px] bg-blue-500 p-4 font-semibold text-white disabled:opacity-50'
-            >
-              {isUploading ? 'Working...' : 'Upload to Cloud'}
-            </button>
+            <p className='text-[14px] text-gray-500'>
+              Your planner syncs automatically across devices.
+            </p>
 
             {(syncError || auth.errorMessage) && (
               <p className='text-[13px] text-red-500'>
@@ -1530,7 +1574,7 @@ function AuthModal({
 
             <button
               onClick={confirmDeleteAccount}
-              disabled={isUploading || isDownloading || isDeletingAccount}
+              disabled={isDeletingAccount}
               className='block w-full py-2 text-[13px] text-gray-300 disabled:opacity-50'
             >
               {isDeletingAccount ? 'Deleting Account...' : 'Delete Account'}
@@ -1557,8 +1601,8 @@ function AuthModal({
 
           <p className='text-center text-[14px] text-gray-500'>
             {isCreatingAccount
-              ? 'Create an account to back up your planner.'
-              : 'Log in to use cloud backup.'}
+              ? 'Create an account to sync your planner.'
+              : 'Log in to sync your planner across devices.'}
           </p>
 
           <input

@@ -1,16 +1,36 @@
-// plannerService
-
 import {
   collection,
   deleteDoc,
   doc,
   getDocs,
+  onSnapshot,
+  query,
   setDoc,
   Timestamp,
+  Unsubscribe,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { FirebaseSomedayGoal, FirebaseWeeklyPlan } from '@/models/planner';
-import { weekKey } from '@/lib/date';
+import {
+  FirebaseDailyGoal,
+  FirebaseSomedayGoal,
+  FirebaseWeeklyGoal,
+  FirebaseWeeklyPlan,
+} from '@/models/planner';
+import { dayKey, endOfWeek, startOfWeek, weekKey } from '@/lib/date';
+
+type FirebaseWeeklyGoalDocument = FirebaseWeeklyGoal & {
+  weekKey: string;
+};
+
+type FirebaseDailyGoalDocument = FirebaseDailyGoal & {
+  weekKey: string;
+};
+
+type FirebaseWeeklyPlanMeta = Omit<
+  FirebaseWeeklyPlan,
+  'weeklyGoals' | 'dailyGoals'
+>;
 
 function cleanUndefined<T>(value: T): T {
   if (Array.isArray(value)) {
@@ -35,90 +55,330 @@ function cleanUndefined<T>(value: T): T {
   return value;
 }
 
-export async function fetchWeeklyPlans(
-  userId: string,
-): Promise<FirebaseWeeklyPlan[]> {
-  const snapshot = await getDocs(
-    collection(db, 'users', userId, 'weeklyPlans'),
-  );
-
-  return snapshot.docs.map((doc) => doc.data() as FirebaseWeeklyPlan);
+function weeklyPlansCollection(userId: string) {
+  return collection(db, 'users', userId, 'weeklyPlans');
 }
 
-export async function fetchSomedayGoals(
-  userId: string,
-): Promise<FirebaseSomedayGoal[]> {
-  const snapshot = await getDocs(
-    collection(db, 'users', userId, 'somedayGoals'),
-  );
-
-  return snapshot.docs.map((doc) => doc.data() as FirebaseSomedayGoal);
+function weeklyPlanDoc(userId: string, key: string) {
+  return doc(db, 'users', userId, 'weeklyPlans', key);
 }
 
-export async function replaceCloudWeeklyPlans(
-  userId: string,
-  plans: FirebaseWeeklyPlan[],
-) {
-  const collectionRef = collection(db, 'users', userId, 'weeklyPlans');
-  const snapshot = await getDocs(collectionRef);
+function weeklyGoalsCollection(userId: string) {
+  return collection(db, 'users', userId, 'weeklyGoals');
+}
 
-  await Promise.all(
-    snapshot.docs.map((document) =>
-      deleteDoc(doc(db, 'users', userId, 'weeklyPlans', document.id)),
+function weeklyGoalDoc(userId: string, goalId: string) {
+  return doc(db, 'users', userId, 'weeklyGoals', goalId);
+}
+
+function dailyGoalsCollection(userId: string) {
+  return collection(db, 'users', userId, 'dailyGoals');
+}
+
+function dailyGoalDoc(userId: string, goalId: string) {
+  return doc(db, 'users', userId, 'dailyGoals', goalId);
+}
+
+function somedayGoalsCollection(userId: string) {
+  return collection(db, 'users', userId, 'somedayGoals');
+}
+
+function somedayGoalDoc(userId: string, goalId: string) {
+  return doc(db, 'users', userId, 'somedayGoals', goalId);
+}
+
+function makePlanMetaFromDate(date: Date): FirebaseWeeklyPlanMeta {
+  const weekStartDate = startOfWeek(date);
+  const weekEndDate = endOfWeek(date);
+  const now = Timestamp.now();
+
+  return {
+    id: weekKey(weekStartDate),
+    weekStartDate: Timestamp.fromDate(weekStartDate),
+    weekEndDate: Timestamp.fromDate(weekEndDate),
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+  };
+}
+
+function assemblePlans(
+  metas: FirebaseWeeklyPlanMeta[],
+  weeklyGoals: FirebaseWeeklyGoalDocument[],
+  dailyGoals: FirebaseDailyGoalDocument[],
+): FirebaseWeeklyPlan[] {
+  const metaMap = new Map<string, FirebaseWeeklyPlanMeta>();
+
+  for (const meta of metas) {
+    metaMap.set(weekKey(meta.weekStartDate.toDate()), meta);
+  }
+
+  for (const goal of weeklyGoals) {
+    if (!metaMap.has(goal.weekKey)) {
+      metaMap.set(goal.weekKey, makePlanMetaFromDate(goal.createdAt.toDate()));
+    }
+  }
+
+  for (const goal of dailyGoals) {
+    if (!metaMap.has(goal.weekKey)) {
+      metaMap.set(goal.weekKey, makePlanMetaFromDate(goal.date.toDate()));
+    }
+  }
+
+  return Array.from(metaMap.entries())
+    .map(([key, meta]) => ({
+      ...meta,
+      weeklyGoals: weeklyGoals
+        .filter((goal) => goal.weekKey === key)
+        .map(({ weekKey: _weekKey, ...goal }) => goal)
+        .sort((a, b) => a.order - b.order),
+      dailyGoals: dailyGoals
+        .filter((goal) => goal.weekKey === key)
+        .map(({ weekKey: _weekKey, ...goal }) => goal)
+        .sort((a, b) => {
+          const dateDiff = a.date.toMillis() - b.date.toMillis();
+          return dateDiff !== 0 ? dateDiff : a.order - b.order;
+        }),
+    }))
+    .sort((a, b) => a.weekStartDate.toMillis() - b.weekStartDate.toMillis());
+}
+
+export function subscribePlannerData(
+  userId: string,
+  onChange: (data: {
+    weeklyPlans: FirebaseWeeklyPlan[];
+    somedayGoals: FirebaseSomedayGoal[];
+  }) => void,
+  onError: (error: Error) => void,
+): Unsubscribe {
+  let metas: FirebaseWeeklyPlanMeta[] = [];
+  let weeklyGoals: FirebaseWeeklyGoalDocument[] = [];
+  let dailyGoals: FirebaseDailyGoalDocument[] = [];
+  let somedayGoals: FirebaseSomedayGoal[] = [];
+
+  function emit() {
+    onChange({
+      weeklyPlans: assemblePlans(metas, weeklyGoals, dailyGoals),
+      somedayGoals: somedayGoals.sort((a, b) => a.order - b.order),
+    });
+  }
+
+  const unsubscribes = [
+    onSnapshot(
+      query(weeklyPlansCollection(userId)),
+      (snapshot) => {
+        metas = snapshot.docs.map(
+          (doc) => doc.data() as FirebaseWeeklyPlanMeta,
+        );
+        emit();
+      },
+      onError,
     ),
-  );
 
-  await Promise.all(
-    plans.map((plan) => {
-      const id = weekKey(plan.weekStartDate.toDate());
+    onSnapshot(
+      query(weeklyGoalsCollection(userId)),
+      (snapshot) => {
+        weeklyGoals = snapshot.docs.map(
+          (doc) => doc.data() as FirebaseWeeklyGoalDocument,
+        );
+        emit();
+      },
+      onError,
+    ),
 
-      return setDoc(
-        doc(db, 'users', userId, 'weeklyPlans', id),
-        cleanUndefined(plan),
-      );
-    }),
+    onSnapshot(
+      query(dailyGoalsCollection(userId)),
+      (snapshot) => {
+        dailyGoals = snapshot.docs.map(
+          (doc) => doc.data() as FirebaseDailyGoalDocument,
+        );
+        emit();
+      },
+      onError,
+    ),
+
+    onSnapshot(
+      query(somedayGoalsCollection(userId)),
+      (snapshot) => {
+        somedayGoals = snapshot.docs.map(
+          (doc) => doc.data() as FirebaseSomedayGoal,
+        );
+        emit();
+      },
+      onError,
+    ),
+  ];
+
+  return () => {
+    unsubscribes.forEach((unsubscribe) => unsubscribe());
+  };
+}
+
+export async function saveWeeklyPlanMeta(
+  userId: string,
+  plan: FirebaseWeeklyPlan,
+) {
+  const key = weekKey(plan.weekStartDate.toDate());
+
+  const meta: FirebaseWeeklyPlanMeta = {
+    id: key,
+    weekStartDate: plan.weekStartDate,
+    weekEndDate: plan.weekEndDate,
+    createdAt: plan.createdAt,
+    updatedAt: plan.updatedAt ?? Timestamp.now(),
+    deletedAt: plan.deletedAt ?? null,
+  };
+
+  await setDoc(weeklyPlanDoc(userId, key), cleanUndefined(meta), {
+    merge: true,
+  });
+}
+
+export async function saveWeeklyGoal(
+  userId: string,
+  plan: FirebaseWeeklyPlan,
+  goal: FirebaseWeeklyGoal,
+) {
+  const key = weekKey(plan.weekStartDate.toDate());
+
+  await saveWeeklyPlanMeta(userId, plan);
+
+  await setDoc(
+    weeklyGoalDoc(userId, goal.id),
+    cleanUndefined({
+      ...goal,
+      weekKey: key,
+    } satisfies FirebaseWeeklyGoalDocument),
+    { merge: true },
   );
 }
 
-export async function replaceCloudSomedayGoals(
+export async function saveWeeklyGoals(
+  userId: string,
+  plan: FirebaseWeeklyPlan,
+  goals: FirebaseWeeklyGoal[],
+) {
+  const key = weekKey(plan.weekStartDate.toDate());
+  const batch = writeBatch(db);
+
+  batch.set(
+    weeklyPlanDoc(userId, key),
+    cleanUndefined({
+      id: key,
+      weekStartDate: plan.weekStartDate,
+      weekEndDate: plan.weekEndDate,
+      createdAt: plan.createdAt,
+      updatedAt: plan.updatedAt ?? Timestamp.now(),
+      deletedAt: plan.deletedAt ?? null,
+    }),
+    { merge: true },
+  );
+
+  for (const goal of goals) {
+    batch.set(
+      weeklyGoalDoc(userId, goal.id),
+      cleanUndefined({
+        ...goal,
+        weekKey: key,
+      } satisfies FirebaseWeeklyGoalDocument),
+      { merge: true },
+    );
+  }
+
+  await batch.commit();
+}
+
+export async function saveDailyGoal(
+  userId: string,
+  plan: FirebaseWeeklyPlan,
+  goal: FirebaseDailyGoal,
+) {
+  const key = weekKey(plan.weekStartDate.toDate());
+
+  await saveWeeklyPlanMeta(userId, plan);
+
+  await setDoc(
+    dailyGoalDoc(userId, goal.id),
+    cleanUndefined({
+      ...goal,
+      weekKey: key,
+    } satisfies FirebaseDailyGoalDocument),
+    { merge: true },
+  );
+}
+
+export async function saveDailyGoals(
+  userId: string,
+  plan: FirebaseWeeklyPlan,
+  goals: FirebaseDailyGoal[],
+) {
+  const key = weekKey(plan.weekStartDate.toDate());
+  const batch = writeBatch(db);
+
+  batch.set(
+    weeklyPlanDoc(userId, key),
+    cleanUndefined({
+      id: key,
+      weekStartDate: plan.weekStartDate,
+      weekEndDate: plan.weekEndDate,
+      createdAt: plan.createdAt,
+      updatedAt: plan.updatedAt ?? Timestamp.now(),
+      deletedAt: plan.deletedAt ?? null,
+    }),
+    { merge: true },
+  );
+
+  for (const goal of goals) {
+    batch.set(
+      dailyGoalDoc(userId, goal.id),
+      cleanUndefined({
+        ...goal,
+        weekKey: key,
+      } satisfies FirebaseDailyGoalDocument),
+      { merge: true },
+    );
+  }
+
+  await batch.commit();
+}
+
+export async function saveSomedayGoal(
+  userId: string,
+  goal: FirebaseSomedayGoal,
+) {
+  await setDoc(somedayGoalDoc(userId, goal.id), cleanUndefined(goal), {
+    merge: true,
+  });
+}
+
+export async function saveSomedayGoals(
   userId: string,
   goals: FirebaseSomedayGoal[],
 ) {
-  const collectionRef = collection(db, 'users', userId, 'somedayGoals');
-  const snapshot = await getDocs(collectionRef);
+  const batch = writeBatch(db);
 
-  await Promise.all(
-    snapshot.docs.map((document) =>
-      deleteDoc(doc(db, 'users', userId, 'somedayGoals', document.id)),
-    ),
-  );
+  for (const goal of goals) {
+    batch.set(somedayGoalDoc(userId, goal.id), cleanUndefined(goal), {
+      merge: true,
+    });
+  }
 
-  await Promise.all(
-    goals.map((goal) =>
-      setDoc(
-        doc(db, 'users', userId, 'somedayGoals', goal.id),
-        cleanUndefined(goal),
-      ),
-    ),
-  );
+  await batch.commit();
 }
 
 export async function deleteCloudUserData(userId: string) {
-  const weeklyPlansSnapshot = await getDocs(
-    collection(db, 'users', userId, 'weeklyPlans'),
-  );
+  const collections = [
+    weeklyPlansCollection(userId),
+    weeklyGoalsCollection(userId),
+    dailyGoalsCollection(userId),
+    somedayGoalsCollection(userId),
+  ];
 
-  await Promise.all(
-    weeklyPlansSnapshot.docs.map((document) => deleteDoc(document.ref)),
-  );
+  for (const collectionRef of collections) {
+    const snapshot = await getDocs(collectionRef);
 
-  const somedayGoalsSnapshot = await getDocs(
-    collection(db, 'users', userId, 'somedayGoals'),
-  );
-
-  await Promise.all(
-    somedayGoalsSnapshot.docs.map((document) => deleteDoc(document.ref)),
-  );
+    await Promise.all(snapshot.docs.map((document) => deleteDoc(document.ref)));
+  }
 
   await deleteDoc(doc(db, 'users', userId));
 }
