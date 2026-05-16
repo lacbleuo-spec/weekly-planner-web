@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { PlannerResponsiveLayout } from '@/components/PlannerResponsiveLayout';
 import { Timestamp } from 'firebase/firestore';
 import {
@@ -49,10 +50,6 @@ const REORDER_THRESHOLD = 42;
 const LOCAL_STORAGE_KEY = 'weekly-planner-local-data-v1';
 const IOS_APP_STORE_URL =
   'https://apps.apple.com/kr/app/weekly-goal-based-planner/id6764600765';
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-};
 
 type StoredTimestamp = {
   seconds: number;
@@ -1408,9 +1405,14 @@ function NoticeModal({
   );
 }
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+};
+
 function MobileAppCard() {
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
+
   const [showInstallNotice, setShowInstallNotice] = useState(false);
 
   const isStandalone =
@@ -1633,38 +1635,27 @@ function GoalRow({
     setIsCopyMenuOpen(false);
   }
 
-  return (
-    <div className='relative flex items-center gap-2 rounded-[14px] bg-white px-1 py-2.5'>
-      <p className='min-w-0 flex-1 text-[16px] text-black'>{title}</p>
+  const copyMenu =
+    typeof document !== 'undefined'
+      ? createPortal(
+          <div className='fixed inset-0 z-[9999] flex items-end justify-center bg-black/30 p-4'>
+            <button
+              type='button'
+              aria-label='Close copy menu'
+              onClick={() => setIsCopyMenuOpen(false)}
+              className='absolute inset-0 z-0 cursor-default'
+            />
 
-      {showCopy && (
-        <div className='relative'>
-          <button
-            type='button'
-            onClick={() => setIsCopyMenuOpen((prev) => !prev)}
-            className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
-            aria-label='Copy goal'
-          >
-            <Copy size={18} />
-          </button>
-
-          {isCopyMenuOpen && (
-            <>
-              <button
-                type='button'
-                aria-label='Close copy menu'
-                onClick={() => setIsCopyMenuOpen(false)}
-                className='fixed inset-0 z-40 cursor-default'
-              />
-
-              <div className='absolute right-0 top-9 z-50 w-[260px] overflow-hidden rounded-[20px] border border-white/70 bg-white/90 shadow-[0_18px_50px_rgba(0,0,0,0.18)] backdrop-blur-xl'>
-                <div className='px-4 pb-2 pt-3'>
-                  <p className='text-[12px] font-semibold uppercase tracking-wide text-gray-400'>
-                    Copy to
+            <div className='relative z-10 w-full max-w-md animate-in slide-in-from-bottom-3 duration-200 rounded-[24px] bg-white p-6'>
+              <div className='space-y-4'>
+                <div className='text-center'>
+                  <h2 className='text-[22px] font-bold'>Copy Weekly Goal</h2>
+                  <p className='mt-2 text-[14px] text-gray-500'>
+                    Choose where to copy this weekly goal.
                   </p>
                 </div>
 
-                <div className='px-2 pb-2'>
+                <div className='grid grid-cols-2 gap-2'>
                   {weekDates.map((date) => (
                     <button
                       key={dayKey(date)}
@@ -1672,58 +1663,69 @@ function GoalRow({
                       onClick={() =>
                         onCopyToDay && handleCopy(() => onCopyToDay(date))
                       }
-                      className='flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left active:bg-gray-100'
+                      className='rounded-[16px] bg-[#f2f2f7] px-4 py-3 text-left active:scale-[0.98]'
                     >
-                      <span className='text-[15px] font-medium text-black'>
+                      <p className='text-[15px] font-semibold text-black'>
                         {englishWeekdayText(date)}
-                      </span>
-
-                      <span className='text-[12px] font-medium text-gray-400'>
+                      </p>
+                      <p className='mt-0.5 text-[12px] text-gray-500'>
                         {monthDayText(date)}
-                      </span>
+                      </p>
                     </button>
                   ))}
                 </div>
 
-                <div className='h-px bg-gray-200/70' />
+                <button
+                  type='button'
+                  onClick={() => onCopyToAllDays && handleCopy(onCopyToAllDays)}
+                  className='flex w-full items-center justify-between rounded-[16px] bg-blue-500 p-4 text-left active:scale-[0.99]'
+                >
+                  <span className='font-semibold text-white'>
+                    Copy to all days
+                  </span>
+                  <span className='text-[13px] font-semibold text-blue-100'>
+                    Mon - Sun
+                  </span>
+                </button>
 
-                <div className='p-2'>
-                  <button
-                    type='button'
-                    onClick={() =>
-                      onCopyToAllDays && handleCopy(onCopyToAllDays)
-                    }
-                    className='flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left active:bg-blue-50'
-                  >
-                    <span className='text-[15px] font-semibold text-blue-500'>
-                      All Days
-                    </span>
-
-                    <span className='text-[12px] font-medium text-blue-300'>
-                      Mon–Sun
-                    </span>
-                  </button>
-
-                  <button
-                    type='button'
-                    onClick={() =>
-                      onCopyToNextWeek && handleCopy(onCopyToNextWeek)
-                    }
-                    className='flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left active:bg-blue-50'
-                  >
-                    <span className='text-[15px] font-semibold text-blue-500'>
-                      Next Week
-                    </span>
-
-                    <span className='text-[12px] font-medium text-blue-300'>
-                      Weekly Goal
-                    </span>
-                  </button>
-                </div>
+                <button
+                  type='button'
+                  onClick={() =>
+                    onCopyToNextWeek && handleCopy(onCopyToNextWeek)
+                  }
+                  className='flex w-full items-center justify-between rounded-[16px] bg-blue-50 p-4 text-left active:scale-[0.99]'
+                >
+                  <span className='font-semibold text-blue-500'>
+                    Copy to next week
+                  </span>
+                  <span className='text-[13px] font-semibold text-blue-300'>
+                    Weekly Goal
+                  </span>
+                </button>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <div className='flex items-center gap-2 rounded-[14px] bg-white px-1 py-2.5'>
+      <p className='min-w-0 flex-1 text-[16px] text-black'>{title}</p>
+
+      {showCopy && (
+        <>
+          <button
+            type='button'
+            onClick={() => setIsCopyMenuOpen(true)}
+            className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
+            aria-label='Copy goal'
+          >
+            <Copy size={18} />
+          </button>
+
+          {isCopyMenuOpen && copyMenu}
+        </>
       )}
 
       <DragHandle onMove={onMove} />
