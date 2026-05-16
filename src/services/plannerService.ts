@@ -17,7 +17,7 @@ import {
   FirebaseWeeklyGoal,
   FirebaseWeeklyPlan,
 } from '@/models/planner';
-import { dayKey, endOfWeek, startOfWeek, weekKey } from '@/lib/date';
+import { endOfWeek, startOfWeek, weekKey } from '@/lib/date';
 
 type FirebaseWeeklyGoalDocument = FirebaseWeeklyGoal & {
   weekKey: string;
@@ -156,10 +156,26 @@ export function subscribePlannerData(
   let dailyGoals: FirebaseDailyGoalDocument[] = [];
   let somedayGoals: FirebaseSomedayGoal[] = [];
 
+  let hasLoadedMetas = false;
+  let hasLoadedWeeklyGoals = false;
+  let hasLoadedDailyGoals = false;
+  let hasLoadedSomedayGoals = false;
+
+  function hasLoadedInitialData() {
+    return (
+      hasLoadedMetas &&
+      hasLoadedWeeklyGoals &&
+      hasLoadedDailyGoals &&
+      hasLoadedSomedayGoals
+    );
+  }
+
   function emit() {
+    if (!hasLoadedInitialData()) return;
+
     onChange({
       weeklyPlans: assemblePlans(metas, weeklyGoals, dailyGoals),
-      somedayGoals: somedayGoals.sort((a, b) => a.order - b.order),
+      somedayGoals: [...somedayGoals].sort((a, b) => a.order - b.order),
     });
   }
 
@@ -167,9 +183,12 @@ export function subscribePlannerData(
     onSnapshot(
       query(weeklyPlansCollection(userId)),
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
+
         metas = snapshot.docs.map(
           (doc) => doc.data() as FirebaseWeeklyPlanMeta,
         );
+        hasLoadedMetas = true;
         emit();
       },
       onError,
@@ -178,9 +197,12 @@ export function subscribePlannerData(
     onSnapshot(
       query(weeklyGoalsCollection(userId)),
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
+
         weeklyGoals = snapshot.docs.map(
           (doc) => doc.data() as FirebaseWeeklyGoalDocument,
         );
+        hasLoadedWeeklyGoals = true;
         emit();
       },
       onError,
@@ -189,9 +211,12 @@ export function subscribePlannerData(
     onSnapshot(
       query(dailyGoalsCollection(userId)),
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
+
         dailyGoals = snapshot.docs.map(
           (doc) => doc.data() as FirebaseDailyGoalDocument,
         );
+        hasLoadedDailyGoals = true;
         emit();
       },
       onError,
@@ -200,9 +225,12 @@ export function subscribePlannerData(
     onSnapshot(
       query(somedayGoalsCollection(userId)),
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
+
         somedayGoals = snapshot.docs.map(
           (doc) => doc.data() as FirebaseSomedayGoal,
         );
+        hasLoadedSomedayGoals = true;
         emit();
       },
       onError,
