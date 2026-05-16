@@ -50,6 +50,10 @@ const LOCAL_STORAGE_KEY = 'weekly-planner-local-data-v1';
 const IOS_APP_STORE_URL =
   'https://apps.apple.com/kr/app/weekly-goal-based-planner/id6764600765';
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+};
+
 type StoredTimestamp = {
   seconds: number;
   nanoseconds: number;
@@ -1405,27 +1409,76 @@ function NoticeModal({
 }
 
 function MobileAppCard() {
-  return (
-    <div className='space-y-2'>
-      <a
-        href={IOS_APP_STORE_URL}
-        target='_blank'
-        rel='noopener noreferrer'
-        className='flex items-center gap-2 text-[17px] font-semibold text-black active:scale-[0.98]'
-      >
-        <span className='w-5 text-center text-[18px] leading-none'></span>
-        iOS
-      </a>
+  const [installPrompt, setInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [showInstallNotice, setShowInstallNotice] = useState(false);
 
+  const isStandalone =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(display-mode: standalone)').matches;
+
+  const isMobile =
+    typeof navigator !== 'undefined' &&
+    /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  const isIOS =
+    typeof navigator !== 'undefined' &&
+    /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  useEffect(() => {
+    function handleBeforeInstallPrompt(event: Event) {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener(
+        'beforeinstallprompt',
+        handleBeforeInstallPrompt,
+      );
+    };
+  }, []);
+
+  async function installApp() {
+    if (!isMobile || isStandalone) return;
+
+    if (installPrompt) {
+      await installPrompt.prompt();
+      setInstallPrompt(null);
+      return;
+    }
+
+    if (isIOS) {
+      setShowInstallNotice(true);
+    }
+  }
+
+  return (
+    <>
       <button
         type='button'
-        disabled
-        className='flex items-center gap-2 text-[17px] font-semibold text-gray-400'
+        onClick={installApp}
+        disabled={!isMobile || isStandalone}
+        className={`flex items-center gap-2 text-[17px] font-semibold ${
+          !isMobile || isStandalone
+            ? 'cursor-default text-gray-400'
+            : 'text-black active:scale-[0.98]'
+        }`}
       >
-        <Smartphone size={18} strokeWidth={2.2} className='w-5' />
-        Android
+        <Smartphone size={19} strokeWidth={2.2} className='w-5' />
+        Install App
       </button>
-    </div>
+
+      {showInstallNotice && (
+        <NoticeModal
+          title='Add to Home Screen'
+          message='Open this page in Safari, tap the Share button, then choose Add to Home Screen.'
+          onClose={() => setShowInstallNotice(false)}
+        />
+      )}
+    </>
   );
 }
 
