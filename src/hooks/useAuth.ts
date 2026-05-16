@@ -1,5 +1,3 @@
-// useAuth
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -10,6 +8,7 @@ import {
   EmailAuthProvider,
   onAuthStateChanged,
   reauthenticateWithCredential,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
 } from 'firebase/auth';
@@ -88,6 +87,20 @@ export function useAuth() {
     }
   }
 
+  async function resetPassword(email: string) {
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (error) {
+      setErrorMessage(authErrorMessage(error));
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   async function signOut() {
     setErrorMessage(null);
 
@@ -141,6 +154,7 @@ export function useAuth() {
     signUp,
     signIn,
     signOut,
+    resetPassword,
     reauthenticateAndDelete,
   };
 }

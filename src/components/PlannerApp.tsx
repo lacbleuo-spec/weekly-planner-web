@@ -5,7 +5,6 @@ import { PlannerResponsiveLayout } from '@/components/PlannerResponsiveLayout';
 import { Timestamp } from 'firebase/firestore';
 import {
   Check,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Circle,
@@ -391,6 +390,22 @@ export default function PlannerApp() {
     };
   }
 
+  function makePlanForWeek(weekStartDate: Date): FirebaseWeeklyPlan {
+    const createdAt = now();
+    const weekEndDate = endOfWeek(weekStartDate);
+
+    return {
+      id: dayKey(weekStartDate),
+      weekStartDate: Timestamp.fromDate(weekStartDate),
+      weekEndDate: Timestamp.fromDate(weekEndDate),
+      createdAt,
+      updatedAt: createdAt,
+      deletedAt: null,
+      weeklyGoals: [],
+      dailyGoals: [],
+    };
+  }
+
   function savePlanChange(updatedPlan: FirebaseWeeklyPlan) {
     setWeeklyPlans((prev) => upsertPlan(prev, updatedPlan));
   }
@@ -528,15 +543,12 @@ export default function PlannerApp() {
     }
   }
 
-  function moveToWeekContaining(value: string) {
-    if (!value) return;
-
-    const [year, month, day] = value.split('-').map(Number);
-    const pickedDate = new Date(year, month - 1, day);
-    const next = startOfWeek(pickedDate);
+  function moveToWeekContaining(date: Date) {
+    const next = startOfWeek(date);
 
     setSelectedWeekStartDate(next);
     syncExpandedDays(next);
+    setShowDatePicker(false);
   }
 
   function addSomedayGoal() {
@@ -668,6 +680,58 @@ export default function PlannerApp() {
     return allGoals
       .filter((goal) => isSameDay(goal.date.toDate(), date))
       .sort((a, b) => a.order - b.order);
+  }
+
+  function copyWeeklyGoalToDailyGoal(title: string, dates: Date[]) {
+    const plan = currentPlan ?? makeCurrentWeekPlan();
+    const createdAt = now();
+
+    const newGoals: FirebaseDailyGoal[] = dates.map((date) => ({
+      id: makeId(),
+      title,
+      date: Timestamp.fromDate(date),
+      isCompleted: false,
+      order: goalsForDate(date).length,
+      createdAt,
+      updatedAt: createdAt,
+      deletedAt: null,
+    }));
+
+    const updatedPlan = {
+      ...plan,
+      updatedAt: now(),
+      dailyGoals: [...plan.dailyGoals, ...newGoals],
+    };
+
+    syncDailyGoalsChange(updatedPlan, newGoals);
+  }
+
+  function copyWeeklyGoalToNextWeek(title: string) {
+    const nextWeekStartDate = addingDays(selectedWeekStartDate, 7);
+
+    const nextWeekPlan =
+      weeklyPlans.find(
+        (plan) =>
+          !plan.deletedAt &&
+          isSameDay(plan.weekStartDate.toDate(), nextWeekStartDate),
+      ) ?? makePlanForWeek(nextWeekStartDate);
+
+    const goal: FirebaseWeeklyGoal = {
+      id: makeId(),
+      title,
+      order: nextWeekPlan.weeklyGoals.filter((goal) => !goal.deletedAt).length,
+      createdAt: now(),
+      updatedAt: now(),
+      deletedAt: null,
+    };
+
+    const updatedPlan = {
+      ...nextWeekPlan,
+      updatedAt: now(),
+      weeklyGoals: [...nextWeekPlan.weeklyGoals, goal],
+    };
+
+    syncWeeklyGoalChange(updatedPlan, goal);
   }
 
   function addDailyGoal(date: Date) {
@@ -817,7 +881,7 @@ export default function PlannerApp() {
             </Card>
 
             <ExpandableCard
-              title='Someday Goals'
+              title='Someday Goals & Plans'
               subtitle={`${visibleSomedayGoals.length} goals`}
               expanded={isSomedayExpanded}
               onToggle={() => setIsSomedayExpanded((prev) => !prev)}
@@ -864,7 +928,7 @@ export default function PlannerApp() {
             />
 
             <ExpandableCard
-              title='Weekly Goals'
+              title='Weekly Goals & Plans'
               subtitle={`${weeklyGoals.length} goals`}
               expanded={isWeeklyExpanded}
               onToggle={() => setIsWeeklyExpanded((prev) => !prev)}
@@ -878,6 +942,14 @@ export default function PlannerApp() {
                   key={goal.id}
                   title={goal.title}
                   showCopy
+                  weekDates={weekDates}
+                  onCopyToDay={(date) =>
+                    copyWeeklyGoalToDailyGoal(goal.title, [date])
+                  }
+                  onCopyToAllDays={() =>
+                    copyWeeklyGoalToDailyGoal(goal.title, weekDates)
+                  }
+                  onCopyToNextWeek={() => copyWeeklyGoalToNextWeek(goal.title)}
                   onMove={(direction) => moveWeeklyGoal(goal.id, direction)}
                   onDelete={() => deleteWeeklyGoal(goal.id)}
                 />
@@ -1012,7 +1084,7 @@ function WeekProgressCard({
   goalsForDate: (date: Date) => FirebaseDailyGoal[];
   showDatePicker: boolean;
   onToggleDatePicker: () => void;
-  onPickDate: (value: string) => void;
+  onPickDate: (date: Date) => void;
   onShowAIAnalysisNotice: () => void;
 }) {
   return (
@@ -1032,16 +1104,10 @@ function WeekProgressCard({
           </button>
 
           {showDatePicker && (
-            <input
-              type='date'
-              autoFocus
-              value={dayKey(selectedWeekStartDate)}
-              onChange={(event) => {
-                onPickDate(event.target.value);
-                onToggleDatePicker();
-              }}
-              onBlur={onToggleDatePicker}
-              className='absolute left-0 top-8 z-20 rounded-xl border border-gray-200 bg-white p-2 text-[14px] shadow-lg outline-none'
+            <CalendarPopover
+              selectedDate={selectedWeekStartDate}
+              onPickDate={onPickDate}
+              onClose={onToggleDatePicker}
             />
           )}
         </div>
@@ -1075,6 +1141,137 @@ function WeekProgressCard({
 
       <WeeklyProgressBars weekDates={weekDates} goalsForDate={goalsForDate} />
     </Card>
+  );
+}
+
+function CalendarPopover({
+  selectedDate,
+  onPickDate,
+  onClose,
+}: {
+  selectedDate: Date;
+  onPickDate: (date: Date) => void;
+  onClose: () => void;
+}) {
+  const [visibleMonth, setVisibleMonth] = useState(
+    new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
+  );
+
+  const monthStart = new Date(
+    visibleMonth.getFullYear(),
+    visibleMonth.getMonth(),
+    1,
+  );
+
+  const startOffset = (monthStart.getDay() + 6) % 7;
+  const calendarStart = addingDays(monthStart, -startOffset);
+
+  const dates = Array.from({ length: 42 }, (_, index) =>
+    addingDays(calendarStart, index),
+  );
+
+  const selectedWeekStart = startOfWeek(selectedDate);
+  const selectedWeekEnd = endOfWeek(selectedDate);
+
+  function moveMonth(direction: number) {
+    setVisibleMonth(
+      new Date(
+        visibleMonth.getFullYear(),
+        visibleMonth.getMonth() + direction,
+        1,
+      ),
+    );
+  }
+
+  return (
+    <>
+      <button
+        type='button'
+        aria-label='Close calendar'
+        onClick={onClose}
+        className='fixed inset-0 z-40 cursor-default'
+      />
+
+      <div className='absolute left-0 top-8 z-50 w-[300px] overflow-hidden rounded-[24px] border border-white/70 bg-white/95 p-3 shadow-[0_18px_50px_rgba(0,0,0,0.18)] backdrop-blur-xl'>
+        <div className='flex items-center justify-between px-1 pb-3'>
+          <button
+            type='button'
+            onClick={() => moveMonth(-1)}
+            className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
+            aria-label='Previous month'
+          >
+            <ChevronUp size={18} className='-rotate-90' />
+          </button>
+
+          <p className='text-[17px] font-semibold text-black'>
+            {visibleMonth.toLocaleDateString('en-US', {
+              month: 'long',
+              year: 'numeric',
+            })}
+          </p>
+
+          <button
+            type='button'
+            onClick={() => moveMonth(1)}
+            className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
+            aria-label='Next month'
+          >
+            <ChevronUp size={18} className='rotate-90' />
+          </button>
+        </div>
+
+        <div className='grid grid-cols-7 pb-1 text-center'>
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
+            <p
+              key={`${day}-${index}`}
+              className='py-1 text-[12px] font-semibold text-gray-400'
+            >
+              {day}
+            </p>
+          ))}
+        </div>
+
+        <div className='grid grid-cols-7 gap-1'>
+          {dates.map((date) => {
+            const isCurrentMonth = date.getMonth() === visibleMonth.getMonth();
+
+            const isSelectedWeek =
+              date >= selectedWeekStart && date <= selectedWeekEnd;
+
+            const isToday = isSameDay(date, new Date());
+
+            return (
+              <button
+                key={dayKey(date)}
+                type='button'
+                onClick={() => onPickDate(date)}
+                className={`flex h-9 items-center justify-center rounded-full text-[14px] font-semibold active:scale-95 ${
+                  isSelectedWeek
+                    ? 'bg-blue-500 text-white'
+                    : isToday
+                      ? 'bg-blue-50 text-blue-500'
+                      : isCurrentMonth
+                        ? 'text-black active:bg-gray-100'
+                        : 'text-gray-300 active:bg-gray-100'
+                }`}
+              >
+                {date.getDate()}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className='mt-3 flex justify-end border-t border-gray-100 pt-3'>
+          <button
+            type='button'
+            onClick={() => onPickDate(new Date())}
+            className='rounded-full bg-blue-50 px-4 py-2 text-[15px] font-semibold text-blue-500 active:scale-[0.98]'
+          >
+            Today
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -1360,34 +1557,120 @@ function DragHandle({ onMove }: { onMove: (direction: number) => void }) {
 function GoalRow({
   title,
   showCopy = false,
+  weekDates = [],
+  onCopyToDay,
+  onCopyToAllDays,
+  onCopyToNextWeek,
   onMove,
   onDelete,
 }: {
   title: string;
   showCopy?: boolean;
+  weekDates?: Date[];
+  onCopyToDay?: (date: Date) => void;
+  onCopyToAllDays?: () => void;
+  onCopyToNextWeek?: () => void;
   onMove: (direction: number) => void;
   onDelete: () => void;
 }) {
-  const [didCopy, setDidCopy] = useState(false);
+  const [isCopyMenuOpen, setIsCopyMenuOpen] = useState(false);
 
-  function copyTitle() {
-    navigator.clipboard.writeText(title);
-    setDidCopy(true);
-    setTimeout(() => setDidCopy(false), 1000);
+  function handleCopy(action: () => void) {
+    action();
+    setIsCopyMenuOpen(false);
   }
 
   return (
-    <div className='flex items-center gap-2 rounded-[14px] bg-white px-1 py-2.5'>
+    <div className='relative flex items-center gap-2 rounded-[14px] bg-white px-1 py-2.5'>
       <p className='min-w-0 flex-1 text-[16px] text-black'>{title}</p>
 
       {showCopy && (
-        <button onClick={copyTitle} className='p-1 text-gray-500'>
-          {didCopy ? (
-            <CheckCircle2 size={18} className='text-green-500' />
-          ) : (
+        <div className='relative'>
+          <button
+            type='button'
+            onClick={() => setIsCopyMenuOpen((prev) => !prev)}
+            className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
+            aria-label='Copy goal'
+          >
             <Copy size={18} />
+          </button>
+
+          {isCopyMenuOpen && (
+            <>
+              <button
+                type='button'
+                aria-label='Close copy menu'
+                onClick={() => setIsCopyMenuOpen(false)}
+                className='fixed inset-0 z-40 cursor-default'
+              />
+
+              <div className='absolute right-0 top-9 z-50 w-[260px] overflow-hidden rounded-[20px] border border-white/70 bg-white/90 shadow-[0_18px_50px_rgba(0,0,0,0.18)] backdrop-blur-xl'>
+                <div className='px-4 pb-2 pt-3'>
+                  <p className='text-[12px] font-semibold uppercase tracking-wide text-gray-400'>
+                    Copy to
+                  </p>
+                </div>
+
+                <div className='px-2 pb-2'>
+                  {weekDates.map((date) => (
+                    <button
+                      key={dayKey(date)}
+                      type='button'
+                      onClick={() =>
+                        onCopyToDay && handleCopy(() => onCopyToDay(date))
+                      }
+                      className='flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left active:bg-gray-100'
+                    >
+                      <span className='text-[15px] font-medium text-black'>
+                        {englishWeekdayText(date)}
+                      </span>
+
+                      <span className='text-[12px] font-medium text-gray-400'>
+                        {monthDayText(date)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className='h-px bg-gray-200/70' />
+
+                <div className='p-2'>
+                  <button
+                    type='button'
+                    onClick={() =>
+                      onCopyToAllDays && handleCopy(onCopyToAllDays)
+                    }
+                    className='flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left active:bg-blue-50'
+                  >
+                    <span className='text-[15px] font-semibold text-blue-500'>
+                      All Days
+                    </span>
+
+                    <span className='text-[12px] font-medium text-blue-300'>
+                      Mon–Sun
+                    </span>
+                  </button>
+
+                  <button
+                    type='button'
+                    onClick={() =>
+                      onCopyToNextWeek && handleCopy(onCopyToNextWeek)
+                    }
+                    className='flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left active:bg-blue-50'
+                  >
+                    <span className='text-[15px] font-semibold text-blue-500'>
+                      Next Week
+                    </span>
+
+                    <span className='text-[12px] font-medium text-blue-300'>
+                      Weekly Goal
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </>
           )}
-        </button>
+        </div>
       )}
 
       <DragHandle onMove={onMove} />
@@ -1458,8 +1741,11 @@ function AuthModal({
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   async function submit() {
+    setSuccessMessage(null);
+
     try {
       if (isCreatingAccount) {
         if (password !== confirmPassword) {
@@ -1473,6 +1759,24 @@ function AuthModal({
       }
 
       onClose();
+    } catch {
+      // useAuth handles errorMessage.
+    }
+  }
+
+  async function sendPasswordReset() {
+    const trimmedEmail = email.trim();
+
+    setSuccessMessage(null);
+
+    if (!trimmedEmail) {
+      auth.setErrorMessage('Please enter your email first.');
+      return;
+    }
+
+    try {
+      await auth.resetPassword(trimmedEmail);
+      setSuccessMessage('Password reset email sent. Please check your inbox.');
     } catch {
       // useAuth handles errorMessage.
     }
@@ -1607,7 +1911,10 @@ function AuthModal({
 
           <input
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setSuccessMessage(null);
+            }}
             placeholder='Email'
             className='w-full rounded-[14px] bg-[#f2f2f7] p-4 outline-none'
           />
@@ -1634,6 +1941,10 @@ function AuthModal({
             <p className='text-[13px] text-red-500'>{auth.errorMessage}</p>
           )}
 
+          {successMessage && (
+            <p className='text-[13px] text-green-600'>{successMessage}</p>
+          )}
+
           <button
             onClick={submit}
             disabled={auth.isLoading}
@@ -1646,9 +1957,21 @@ function AuthModal({
                 : 'Log In'}
           </button>
 
+          {!isCreatingAccount && (
+            <button
+              type='button'
+              onClick={sendPasswordReset}
+              disabled={auth.isLoading}
+              className='w-full text-[14px] font-medium text-gray-500 disabled:opacity-50'
+            >
+              Forgot password?
+            </button>
+          )}
+
           <button
             onClick={() => {
               setIsCreatingAccount((prev) => !prev);
+              setSuccessMessage(null);
               auth.setErrorMessage(null);
             }}
             className='w-full text-[14px] text-blue-500'
