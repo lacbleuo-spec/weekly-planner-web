@@ -9,14 +9,13 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ChevronUp,
   Circle,
   Cloud,
   CloudIcon,
   Copy,
   LogOut,
+  MoreHorizontal,
   Plus,
   Smartphone,
   Trash2,
@@ -250,6 +249,9 @@ export default function PlannerApp() {
     new Set([dayKey(new Date())]),
   );
 
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showAIAnalysisNotice, setShowAIAnalysisNotice] = useState(false);
+
   useEffect(() => {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
 
@@ -436,11 +438,11 @@ export default function PlannerApp() {
     setSomedayGoals(updatedGoals);
   }
 
-  function moveWeek(days: number) {
-    const next = addingDays(selectedWeekStartDate, days);
-    setSelectedWeekStartDate(next);
+  function syncExpandedDays(nextWeekStartDate: Date) {
+    const dates = Array.from({ length: 7 }, (_, i) =>
+      addingDays(nextWeekStartDate, i),
+    );
 
-    const dates = Array.from({ length: 7 }, (_, i) => addingDays(next, i));
     const isDesktop = window.matchMedia('(min-width: 1280px)').matches;
 
     if (isDesktop) {
@@ -453,6 +455,17 @@ export default function PlannerApp() {
     } else {
       setExpandedDayKeys(new Set());
     }
+  }
+
+  function moveToWeekContaining(value: string) {
+    if (!value) return;
+
+    const [year, month, day] = value.split('-').map(Number);
+    const pickedDate = new Date(year, month - 1, day);
+    const next = startOfWeek(pickedDate);
+
+    setSelectedWeekStartDate(next);
+    syncExpandedDays(next);
   }
 
   function addSomedayGoal() {
@@ -745,52 +758,19 @@ export default function PlannerApp() {
         }
         weekSidebar={
           <>
-            <div className='flex items-center justify-between'>
-              <button
-                onClick={() => moveWeek(-7)}
-                className='flex h-10 w-10 items-center justify-center rounded-full bg-white'
-              >
-                <ChevronLeft size={22} strokeWidth={2.4} />
-              </button>
-
-              <p className='text-center text-[14px] text-gray-500'>
-                {monthDayText(selectedWeekStartDate)} (
-                {weekdayShort(selectedWeekStartDate)}) -{' '}
-                {monthDayText(selectedWeekEndDate)} (
-                {weekdayShort(selectedWeekEndDate)})
-              </p>
-
-              <button
-                onClick={() => moveWeek(7)}
-                className='flex h-10 w-10 items-center justify-center rounded-full bg-white'
-              >
-                <ChevronRight size={22} strokeWidth={2.4} />
-              </button>
-            </div>
-
-            <Card>
-              <div className='flex items-end justify-between'>
-                <div>
-                  <h2 className='text-[17px] font-semibold'>
-                    Overall Progress
-                  </h2>
-                  <p className='mt-1 text-[15px] text-gray-500'>
-                    {completedCount} / {allGoals.length} completed
-                  </p>
-                </div>
-
-                <p className='text-[34px] font-bold leading-none text-blue-500'>
-                  {Math.round(progress * 100)}%
-                </p>
-              </div>
-
-              <div className='mt-4 h-3 overflow-hidden rounded-full bg-gray-200'>
-                <div
-                  className='h-full rounded-full bg-blue-500 transition-all'
-                  style={{ width: `${progress * 100}%` }}
-                />
-              </div>
-            </Card>
+            <WeekProgressCard
+              selectedWeekStartDate={selectedWeekStartDate}
+              selectedWeekEndDate={selectedWeekEndDate}
+              weekDates={weekDates}
+              completedCount={completedCount}
+              totalCount={allGoals.length}
+              progress={progress}
+              goalsForDate={goalsForDate}
+              showDatePicker={showDatePicker}
+              onToggleDatePicker={() => setShowDatePicker((prev) => !prev)}
+              onPickDate={moveToWeekContaining}
+              onShowAIAnalysisNotice={() => setShowAIAnalysisNotice(true)}
+            />
 
             <ExpandableCard
               title='Weekly Goals'
@@ -888,6 +868,14 @@ export default function PlannerApp() {
         }}
       />
 
+      {showAIAnalysisNotice && (
+        <NoticeModal
+          title='AI Analysis'
+          message='Your AI weekly analysis report is coming soon.'
+          onClose={() => setShowAIAnalysisNotice(false)}
+        />
+      )}
+
       {showAuthModal && (
         <AuthModal
           auth={auth}
@@ -911,6 +899,223 @@ export default function PlannerApp() {
 
 function Card({ children }: { children: React.ReactNode }) {
   return <section className='rounded-[24px] bg-white p-5'>{children}</section>;
+}
+
+function WeekProgressCard({
+  selectedWeekStartDate,
+  selectedWeekEndDate,
+  weekDates,
+  completedCount,
+  totalCount,
+  progress,
+  goalsForDate,
+  showDatePicker,
+  onToggleDatePicker,
+  onPickDate,
+  onShowAIAnalysisNotice,
+}: {
+  selectedWeekStartDate: Date;
+  selectedWeekEndDate: Date;
+  weekDates: Date[];
+  completedCount: number;
+  totalCount: number;
+  progress: number;
+  goalsForDate: (date: Date) => FirebaseDailyGoal[];
+  showDatePicker: boolean;
+  onToggleDatePicker: () => void;
+  onPickDate: (value: string) => void;
+  onShowAIAnalysisNotice: () => void;
+}) {
+  return (
+    <Card>
+      <div className='flex items-center justify-between gap-3'>
+        <div className='relative'>
+          <button
+            onClick={onToggleDatePicker}
+            className='flex items-center gap-1.5 text-[17px] font-semibold text-black'
+          >
+            <span>
+              {monthDayText(selectedWeekStartDate)} -{' '}
+              {monthDayText(selectedWeekEndDate)}
+            </span>
+
+            <ChevronDown size={15} strokeWidth={3} className='text-gray-500' />
+          </button>
+
+          {showDatePicker && (
+            <input
+              type='date'
+              autoFocus
+              value={dayKey(selectedWeekStartDate)}
+              onChange={(event) => {
+                onPickDate(event.target.value);
+                onToggleDatePicker();
+              }}
+              onBlur={onToggleDatePicker}
+              className='absolute left-0 top-8 z-20 rounded-xl border border-gray-200 bg-white p-2 text-[14px] shadow-lg outline-none'
+            />
+          )}
+        </div>
+
+        <button
+          onClick={onShowAIAnalysisNotice}
+          className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500'
+          aria-label='AI Analysis'
+        >
+          <MoreHorizontal size={20} strokeWidth={2.5} />
+        </button>
+      </div>
+
+      <div className='mt-5 flex items-center justify-between gap-4'>
+        <div>
+          <h2 className='text-[17px] font-semibold'>Overall Progress</h2>
+
+          <p className='mt-1 text-[12px] text-gray-500'>
+            {completedCount} / {totalCount} completed
+          </p>
+        </div>
+
+        <div className='flex items-center gap-3'>
+          <p className='text-[34px] font-bold leading-none text-blue-500'>
+            {Math.round(progress * 100)}%
+          </p>
+
+          <CircularProgressRing progress={progress} />
+        </div>
+      </div>
+
+      <WeeklyProgressBars weekDates={weekDates} goalsForDate={goalsForDate} />
+    </Card>
+  );
+}
+
+function CircularProgressRing({ progress }: { progress: number }) {
+  const radius = 22;
+  const strokeWidth = 7;
+  const circumference = 2 * Math.PI * radius;
+  const clampedProgress = Math.max(0, Math.min(progress, 1));
+
+  return (
+    <svg width='52' height='52' viewBox='0 0 52 52'>
+      <circle
+        cx='26'
+        cy='26'
+        r={radius}
+        fill='none'
+        stroke='rgb(219 234 254)'
+        strokeWidth={strokeWidth}
+      />
+
+      <circle
+        cx='26'
+        cy='26'
+        r={radius}
+        fill='none'
+        stroke='rgb(59 130 246)'
+        strokeWidth={strokeWidth}
+        strokeLinecap='round'
+        strokeDasharray={circumference}
+        strokeDashoffset={circumference * (1 - clampedProgress)}
+        transform='rotate(-90 26 26)'
+        className='transition-all duration-300'
+      />
+    </svg>
+  );
+}
+
+function WeeklyProgressBars({
+  weekDates,
+  goalsForDate,
+}: {
+  weekDates: Date[];
+  goalsForDate: (date: Date) => FirebaseDailyGoal[];
+}) {
+  const maxGoalCount = Math.max(
+    ...weekDates.map((date) => goalsForDate(date).length),
+    1,
+  );
+
+  const maxBarHeight = 82;
+  const minBarHeight = 28;
+
+  return (
+    <div className='mt-5 flex items-end'>
+      {weekDates.map((date) => {
+        const goals = goalsForDate(date);
+        const total = goals.length;
+        const completed = goals.filter((goal) => goal.isCompleted).length;
+
+        const backgroundHeight =
+          total === 0
+            ? 0
+            : Math.max(minBarHeight, (total / maxGoalCount) * maxBarHeight);
+
+        const completedHeight =
+          total === 0 ? 0 : backgroundHeight * (completed / total);
+
+        return (
+          <div
+            key={dayKey(date)}
+            className='flex flex-1 flex-col items-center gap-2'
+          >
+            <div
+              className='flex items-end justify-center'
+              style={{ height: maxBarHeight }}
+            >
+              {total > 0 && (
+                <div
+                  className='relative w-[14px] overflow-hidden rounded-full bg-blue-100'
+                  style={{ height: backgroundHeight }}
+                >
+                  {completed > 0 && (
+                    <div
+                      className='absolute bottom-0 left-0 w-full rounded-full bg-blue-500 transition-all'
+                      style={{ height: Math.max(8, completedHeight) }}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
+            <p className='text-[12px] text-gray-500'>{weekdayShort(date)}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function NoticeModal({
+  title,
+  message,
+  onClose,
+}: {
+  title: string;
+  message: string;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      onClick={onClose}
+      className='fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6'
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        className='w-full max-w-sm rounded-[24px] bg-white p-6 text-center'
+      >
+        <h2 className='text-[18px] font-bold'>{title}</h2>
+
+        <p className='mt-3 text-[15px] text-gray-500'>{message}</p>
+
+        <button
+          onClick={onClose}
+          className='mt-5 rounded-[16px] bg-blue-500 px-6 py-3 font-semibold text-white'
+        >
+          OK
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function MobileAppCard() {
