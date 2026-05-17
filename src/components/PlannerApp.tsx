@@ -1,3 +1,5 @@
+// PlannerApp
+
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -16,7 +18,7 @@ import {
   MoreHorizontal,
   Plus,
   Smartphone,
-  Trash2,
+  Trash,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -1171,9 +1173,6 @@ function CalendarPopover({
     addingDays(calendarStart, index),
   );
 
-  const selectedWeekStart = startOfWeek(selectedDate);
-  const selectedWeekEnd = endOfWeek(selectedDate);
-
   function moveMonth(direction: number) {
     setVisibleMonth(
       new Date(
@@ -1235,10 +1234,7 @@ function CalendarPopover({
         <div className='grid grid-cols-7 gap-1'>
           {dates.map((date) => {
             const isCurrentMonth = date.getMonth() === visibleMonth.getMonth();
-
-            const isSelectedWeek =
-              date >= selectedWeekStart && date <= selectedWeekEnd;
-
+            const isSelectedDate = isSameDay(date, selectedDate);
             const isToday = isSameDay(date, new Date());
 
             return (
@@ -1247,7 +1243,7 @@ function CalendarPopover({
                 type='button'
                 onClick={() => onPickDate(date)}
                 className={`flex h-9 items-center justify-center rounded-full text-[14px] font-semibold active:scale-95 ${
-                  isSelectedWeek
+                  isSelectedDate
                     ? 'bg-blue-500 text-white'
                     : isToday
                       ? 'bg-blue-50 text-blue-500'
@@ -1721,7 +1717,7 @@ function GoalRow({
             className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
             aria-label='Copy goal'
           >
-            <Copy size={18} />
+            <Copy size={17} />
           </button>
 
           {isCopyMenuOpen && copyMenu}
@@ -1731,7 +1727,7 @@ function GoalRow({
       <DragHandle onMove={onMove} />
 
       <button onClick={onDelete} className='p-1 text-red-500'>
-        <Trash2 size={18} />
+        <Trash size={18} />
       </button>
     </div>
   );
@@ -1771,7 +1767,7 @@ function DailyGoalRow({
       <DragHandle onMove={onMove} />
 
       <button onClick={onDelete} className='p-1 text-red-500'>
-        <Trash2 size={18} />
+        <Trash size={18} />
       </button>
     </div>
   );
