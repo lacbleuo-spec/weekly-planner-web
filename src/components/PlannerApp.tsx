@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   Circle,
+  Clock,
   Cloud,
   CloudIcon,
   Copy,
@@ -46,12 +47,23 @@ import {
   FirebaseSomedayGoal,
   FirebaseWeeklyGoal,
   FirebaseWeeklyPlan,
+  GoalKind,
+  GoalReminder,
 } from '@/models/planner';
 
 const REORDER_THRESHOLD = 42;
 const LOCAL_STORAGE_KEY = 'weekly-planner-local-data-v1';
 const IOS_APP_STORE_URL =
   'https://apps.apple.com/kr/app/weekly-goal-based-planner/id6764600765';
+
+const GOAL_KIND_ORDER = {
+  schedule: 0,
+  flexible: 1,
+  strong: 2,
+} satisfies Record<GoalKind, number>;
+
+const STRONG_GOAL_NOTICE =
+  'Strong goals cannot be deleted once added to daily goals. Continue?';
 
 type StoredTimestamp = {
   seconds: number;
@@ -110,12 +122,43 @@ type StoredPlannerData = {
   somedayGoals: StoredSomedayGoal[];
 };
 
+type PendingGoalTarget = { type: 'weekly' } | { type: 'daily'; date: Date };
+
+type GoalProgressStats = {
+  completedCount: number;
+  totalCount: number;
+  progress: number;
+};
+
+type GoalProgressFilter = 'overall' | 'flexible' | 'strong';
+
 function makeId() {
   return crypto.randomUUID();
 }
 
 function now() {
   return Timestamp.now();
+}
+
+function goalKind(goal: { kind?: GoalKind }) {
+  return goal.kind ?? 'flexible';
+}
+
+function sortGoalsByKindAndOrder<
+  T extends { kind?: GoalKind; time?: string | null; order: number },
+>(goals: T[]) {
+  return [...goals].sort((a, b) => {
+    const kindDiff =
+      GOAL_KIND_ORDER[goalKind(a)] - GOAL_KIND_ORDER[goalKind(b)];
+    if (kindDiff !== 0) return kindDiff;
+
+    if (goalKind(a) === 'schedule') {
+      const timeDiff = (a.time ?? '').localeCompare(b.time ?? '');
+      if (timeDiff !== 0) return timeDiff;
+    }
+
+    return a.order - b.order;
+  });
 }
 
 function storeTimestamp(timestamp?: Timestamp | null): StoredTimestamp | null {
@@ -238,6 +281,9 @@ export default function PlannerApp() {
   const [newSomedayGoalText, setNewSomedayGoalText] = useState('');
   const [newGoalTexts, setNewGoalTexts] = useState<Record<string, string>>({});
 
+  const [pendingGoalTarget, setPendingGoalTarget] =
+    useState<PendingGoalTarget | null>(null);
+
   const [isSomedayExpanded, setIsSomedayExpanded] = useState(false);
   const [isWeeklyExpanded, setIsWeeklyExpanded] = useState(true);
   const [expandedDayKeys, setExpandedDayKeys] = useState<Set<string>>(
@@ -334,10 +380,8 @@ export default function PlannerApp() {
   }, [weeklyPlans, selectedWeekStartDate]);
 
   const weeklyGoals = useMemo(() => {
-    return (
-      currentPlan?.weeklyGoals
-        .filter((goal) => !goal.deletedAt)
-        .sort((a, b) => a.order - b.order) ?? []
+    return sortGoalsByKindAndOrder(
+      currentPlan?.weeklyGoals.filter((goal) => !goal.deletedAt) ?? [],
     );
   }, [currentPlan]);
 
@@ -345,8 +389,26 @@ export default function PlannerApp() {
     return currentPlan?.dailyGoals.filter((goal) => !goal.deletedAt) ?? [];
   }, [currentPlan]);
 
-  const completedCount = allGoals.filter((goal) => goal.isCompleted).length;
-  const progress = allGoals.length === 0 ? 0 : completedCount / allGoals.length;
+  const overallProgressStats = useMemo(
+    () => progressStatsForGoals(allGoals),
+    [allGoals],
+  );
+
+  const flexibleProgressStats = useMemo(
+    () =>
+      progressStatsForGoals(
+        allGoals.filter((goal) => goalKind(goal) === 'flexible'),
+      ),
+    [allGoals],
+  );
+
+  const strongProgressStats = useMemo(
+    () =>
+      progressStatsForGoals(
+        allGoals.filter((goal) => goalKind(goal) === 'strong'),
+      ),
+    [allGoals],
+  );
 
   const visibleSomedayGoals = useMemo(() => {
     return somedayGoals
@@ -614,25 +676,94 @@ export default function PlannerApp() {
     const text = newWeeklyGoalText.trim();
     if (!text) return;
 
-    const plan = currentPlan ?? makeCurrentWeekPlan();
+    setPendingGoalTarget({ type: 'weekly' });
+  }
 
-    const goal: FirebaseWeeklyGoal = {
+  function confirmAddGoal(options: {
+    kind: GoalKind;
+    time: string | null;
+    reminder: GoalReminder;
+  }) {
+    if (!pendingGoalTarget) return;
+
+    if (
+      options.kind === 'strong' &&
+      pendingGoalTarget.type === 'daily' &&
+      !window.confirm(STRONG_GOAL_NOTICE)
+    ) {
+      return;
+    }
+
+    if (pendingGoalTarget.type === 'weekly') {
+      const text = newWeeklyGoalText.trim();
+      if (!text) return;
+
+      const plan = currentPlan ?? makeCurrentWeekPlan();
+      const createdAt = now();
+
+      const sameKindGoals = weeklyGoals.filter(
+        (goal) => goalKind(goal) === options.kind,
+      );
+
+      const goal: FirebaseWeeklyGoal = {
+        id: makeId(),
+        title: text,
+        kind: options.kind,
+        time: null,
+        reminder: 'none',
+        order: sameKindGoals.length,
+        createdAt,
+        updatedAt: createdAt,
+        deletedAt: null,
+      };
+
+      const updatedPlan = {
+        ...plan,
+        updatedAt: now(),
+        weeklyGoals: [...plan.weeklyGoals, goal],
+      };
+
+      setNewWeeklyGoalText('');
+      setPendingGoalTarget(null);
+      syncWeeklyGoalChange(updatedPlan, goal);
+      return;
+    }
+
+    const date = pendingGoalTarget.date;
+    const key = dayKey(date);
+    const text = (newGoalTexts[key] ?? '').trim();
+    if (!text) return;
+
+    const plan = currentPlan ?? makeCurrentWeekPlan();
+    const createdAt = now();
+
+    const sameKindGoals = goalsForDate(date).filter(
+      (goal) => goalKind(goal) === options.kind,
+    );
+
+    const goal: FirebaseDailyGoal = {
       id: makeId(),
       title: text,
-      order: weeklyGoals.length,
-      createdAt: now(),
-      updatedAt: now(),
+      date: Timestamp.fromDate(date),
+      isCompleted: false,
+      kind: options.kind,
+      time: null,
+      reminder: 'none',
+      order: sameKindGoals.length,
+      createdAt,
+      updatedAt: createdAt,
       deletedAt: null,
     };
 
     const updatedPlan = {
       ...plan,
       updatedAt: now(),
-      weeklyGoals: [...plan.weeklyGoals, goal],
+      dailyGoals: [...plan.dailyGoals, goal],
     };
 
-    setNewWeeklyGoalText('');
-    syncWeeklyGoalChange(updatedPlan, goal);
+    setNewGoalTexts((prev) => ({ ...prev, [key]: '' }));
+    setPendingGoalTarget(null);
+    syncDailyGoalChange(updatedPlan, goal);
   }
 
   function deleteWeeklyGoal(goalId: string) {
@@ -659,7 +790,13 @@ export default function PlannerApp() {
   function moveWeeklyGoal(goalId: string, direction: number) {
     if (!currentPlan) return;
 
-    const goals = [...weeklyGoals];
+    const target = weeklyGoals.find((goal) => goal.id === goalId);
+    if (!target) return;
+
+    const goals = weeklyGoals.filter(
+      (goal) => goalKind(goal) === goalKind(target),
+    );
+
     const currentIndex = goals.findIndex((goal) => goal.id === goalId);
     const newIndex = currentIndex + direction;
 
@@ -685,21 +822,43 @@ export default function PlannerApp() {
   }
 
   function goalsForDate(date: Date) {
-    return allGoals
-      .filter((goal) => isSameDay(goal.date.toDate(), date))
-      .sort((a, b) => a.order - b.order);
+    const goals = allGoals.filter((goal) =>
+      isSameDay(goal.date.toDate(), date),
+    );
+
+    const timedGoals = goals
+      .filter((goal) => goal.time)
+      .sort((a, b) => {
+        const timeDiff = (a.time ?? '').localeCompare(b.time ?? '');
+        return timeDiff !== 0 ? timeDiff : a.order - b.order;
+      });
+
+    const untimedGoals = sortGoalsByKindAndOrder(
+      goals.filter((goal) => !goal.time),
+    );
+
+    return [...timedGoals, ...untimedGoals];
   }
 
-  function copyWeeklyGoalToDailyGoal(title: string, dates: Date[]) {
+  function copyWeeklyGoalToDailyGoal(goal: FirebaseWeeklyGoal, dates: Date[]) {
+    if (goalKind(goal) === 'strong' && !window.confirm(STRONG_GOAL_NOTICE)) {
+      return;
+    }
+
     const plan = currentPlan ?? makeCurrentWeekPlan();
     const createdAt = now();
 
     const newGoals: FirebaseDailyGoal[] = dates.map((date) => ({
       id: makeId(),
-      title,
+      title: goal.title,
       date: Timestamp.fromDate(date),
       isCompleted: false,
-      order: goalsForDate(date).length,
+      kind: goal.kind ?? 'flexible',
+      time: null,
+      reminder: 'none',
+      order: goalsForDate(date).filter(
+        (dailyGoal) => goalKind(dailyGoal) === goalKind(goal),
+      ).length,
       createdAt,
       updatedAt: createdAt,
       deletedAt: null,
@@ -714,7 +873,7 @@ export default function PlannerApp() {
     syncDailyGoalsChange(updatedPlan, newGoals);
   }
 
-  function copyWeeklyGoalToNextWeek(title: string) {
+  function copyWeeklyGoalToNextWeek(goalToCopy: FirebaseWeeklyGoal) {
     const nextWeekStartDate = addingDays(selectedWeekStartDate, 7);
 
     const nextWeekPlan =
@@ -724,10 +883,19 @@ export default function PlannerApp() {
           isSameDay(plan.weekStartDate.toDate(), nextWeekStartDate),
       ) ?? makePlanForWeek(nextWeekStartDate);
 
+    const visibleNextWeekGoals = nextWeekPlan.weeklyGoals.filter(
+      (goal) => !goal.deletedAt,
+    );
+
     const goal: FirebaseWeeklyGoal = {
       id: makeId(),
-      title,
-      order: nextWeekPlan.weeklyGoals.filter((goal) => !goal.deletedAt).length,
+      title: goalToCopy.title,
+      kind: goalToCopy.kind ?? 'flexible',
+      time: null,
+      reminder: 'none',
+      order: visibleNextWeekGoals.filter(
+        (goal) => goalKind(goal) === goalKind(goalToCopy),
+      ).length,
       createdAt: now(),
       updatedAt: now(),
       deletedAt: null,
@@ -747,27 +915,7 @@ export default function PlannerApp() {
     const text = (newGoalTexts[key] ?? '').trim();
     if (!text) return;
 
-    const plan = currentPlan ?? makeCurrentWeekPlan();
-
-    const goal: FirebaseDailyGoal = {
-      id: makeId(),
-      title: text,
-      date: Timestamp.fromDate(date),
-      isCompleted: false,
-      order: goalsForDate(date).length,
-      createdAt: now(),
-      updatedAt: now(),
-      deletedAt: null,
-    };
-
-    const updatedPlan = {
-      ...plan,
-      updatedAt: now(),
-      dailyGoals: [...plan.dailyGoals, goal],
-    };
-
-    setNewGoalTexts((prev) => ({ ...prev, [key]: '' }));
-    syncDailyGoalChange(updatedPlan, goal);
+    setPendingGoalTarget({ type: 'daily', date });
   }
 
   function toggleDailyGoal(goalId: string) {
@@ -816,10 +964,47 @@ export default function PlannerApp() {
     syncDailyGoalChange(updatedPlan, deletedGoal);
   }
 
+  function updateDailyGoalTimeAndReminder(
+    goalId: string,
+    time: string | null,
+    reminder: GoalReminder,
+  ) {
+    if (!currentPlan) return;
+
+    const targetGoal = currentPlan.dailyGoals.find(
+      (goal) => goal.id === goalId,
+    );
+    if (!targetGoal) return;
+
+    const updatedGoal = {
+      ...targetGoal,
+      time,
+      reminder: time ? reminder : 'none',
+      updatedAt: now(),
+    };
+
+    const updatedPlan = {
+      ...currentPlan,
+      updatedAt: now(),
+      dailyGoals: currentPlan.dailyGoals.map((goal) =>
+        goal.id === goalId ? updatedGoal : goal,
+      ),
+    };
+
+    syncDailyGoalChange(updatedPlan, updatedGoal);
+  }
+
   function moveDailyGoal(goalId: string, date: Date, direction: number) {
     if (!currentPlan) return;
 
-    const goals = goalsForDate(date);
+    const target = goalsForDate(date).find((goal) => goal.id === goalId);
+    if (!target) return;
+    if (target.time) return;
+
+    const goals = goalsForDate(date).filter(
+      (goal) => !goal.time && goalKind(goal) === goalKind(target),
+    );
+
     const currentIndex = goals.findIndex((goal) => goal.id === goalId);
     const newIndex = currentIndex + direction;
 
@@ -925,9 +1110,9 @@ export default function PlannerApp() {
               selectedWeekStartDate={selectedWeekStartDate}
               selectedWeekEndDate={selectedWeekEndDate}
               weekDates={weekDates}
-              completedCount={completedCount}
-              totalCount={allGoals.length}
-              progress={progress}
+              overallProgressStats={overallProgressStats}
+              flexibleProgressStats={flexibleProgressStats}
+              strongProgressStats={strongProgressStats}
               goalsForDate={goalsForDate}
               showDatePicker={showDatePicker}
               onToggleDatePicker={() => setShowDatePicker((prev) => !prev)}
@@ -945,22 +1130,24 @@ export default function PlannerApp() {
                 <EmptyText>Add your goals for this week</EmptyText>
               )}
 
-              {weeklyGoals.map((goal) => (
-                <GoalRow
-                  key={goal.id}
-                  title={goal.title}
-                  showCopy
-                  weekDates={weekDates}
-                  onCopyToDay={(date) =>
-                    copyWeeklyGoalToDailyGoal(goal.title, [date])
-                  }
-                  onCopyToAllDays={() =>
-                    copyWeeklyGoalToDailyGoal(goal.title, weekDates)
-                  }
-                  onCopyToNextWeek={() => copyWeeklyGoalToNextWeek(goal.title)}
-                  onMove={(direction) => moveWeeklyGoal(goal.id, direction)}
-                  onDelete={() => deleteWeeklyGoal(goal.id)}
-                />
+              {weeklyGoals.map((goal, index) => (
+                <div key={goal.id}>
+                  {shouldShowGoalDivider(weeklyGoals, index) && <GoalDivider />}
+                  <GoalRow
+                    title={goal.title}
+                    showCopy
+                    weekDates={weekDates}
+                    onCopyToDay={(date) =>
+                      copyWeeklyGoalToDailyGoal(goal, [date])
+                    }
+                    onCopyToAllDays={() =>
+                      copyWeeklyGoalToDailyGoal(goal, weekDates)
+                    }
+                    onCopyToNextWeek={() => copyWeeklyGoalToNextWeek(goal)}
+                    onMove={(direction) => moveWeeklyGoal(goal.id, direction)}
+                    onDelete={() => deleteWeeklyGoal(goal.id)}
+                  />
+                </div>
               ))}
 
               <AddInput
@@ -1016,16 +1203,28 @@ export default function PlannerApp() {
                     <EmptyText>Add goals for this day</EmptyText>
                   )}
 
-                  {goals.map((goal) => (
-                    <DailyGoalRow
-                      key={goal.id}
-                      goal={goal}
-                      onToggle={() => toggleDailyGoal(goal.id)}
-                      onMove={(direction) =>
-                        moveDailyGoal(goal.id, date, direction)
-                      }
-                      onDelete={() => deleteDailyGoal(goal.id)}
-                    />
+                  {goals.map((goal, index) => (
+                    <div key={goal.id}>
+                      {shouldShowDailyGoalDivider(goals, index) && (
+                        <GoalDivider />
+                      )}
+                      <DailyGoalRow
+                        goal={goal}
+                        canMove={!goal.time}
+                        onToggle={() => toggleDailyGoal(goal.id)}
+                        onMove={(direction) =>
+                          moveDailyGoal(goal.id, date, direction)
+                        }
+                        onUpdateTimeReminder={(time, reminder) =>
+                          updateDailyGoalTimeAndReminder(
+                            goal.id,
+                            time,
+                            reminder,
+                          )
+                        }
+                        onDelete={() => deleteDailyGoal(goal.id)}
+                      />
+                    </div>
                   ))}
 
                   <AddInput
@@ -1042,6 +1241,14 @@ export default function PlannerApp() {
           );
         }}
       />
+
+      {pendingGoalTarget && (
+        <GoalTypeModal
+          targetType={pendingGoalTarget.type}
+          onClose={() => setPendingGoalTarget(null)}
+          onConfirm={confirmAddGoal}
+        />
+      )}
 
       {showAIAnalysisNotice && (
         <NoticeModal
@@ -1074,13 +1281,83 @@ function Card({ children }: { children: React.ReactNode }) {
   return <section className='rounded-[24px] bg-white p-5'>{children}</section>;
 }
 
+function GoalTypeModal({
+  targetType,
+  onClose,
+  onConfirm,
+}: {
+  targetType: 'weekly' | 'daily';
+  onClose: () => void;
+  onConfirm: (options: {
+    kind: GoalKind;
+    time: string | null;
+    reminder: GoalReminder;
+  }) => void;
+}) {
+  const [kind, setKind] = useState<GoalKind>('flexible');
+
+  return (
+    <div
+      onClick={onClose}
+      className='fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4'
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        className='w-full max-w-md rounded-[24px] bg-white p-6'
+      >
+        <div className='space-y-4'>
+          <div className='text-center'>
+            <h2 className='text-[22px] font-bold'>Add Goal</h2>
+            <p className='mt-2 text-[14px] text-gray-500'>
+              Choose the goal type.
+            </p>
+          </div>
+
+          <div className='grid grid-cols-2 gap-2'>
+            {[
+              ['flexible', 'Flexible Goal'],
+              ['strong', 'Strong Goal'],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type='button'
+                onClick={() => setKind(value as GoalKind)}
+                className={`rounded-[16px] px-3 py-3 text-[14px] font-semibold active:scale-[0.98] ${
+                  kind === value
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-[#f2f2f7] text-gray-600'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() =>
+              onConfirm({
+                kind,
+                time: null,
+                reminder: 'none',
+              })
+            }
+            className='w-full rounded-[16px] bg-blue-500 p-4 font-semibold text-white'
+          >
+            Add
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function WeekProgressCard({
   selectedWeekStartDate,
   selectedWeekEndDate,
   weekDates,
-  completedCount,
-  totalCount,
-  progress,
+  overallProgressStats,
+  flexibleProgressStats,
+  strongProgressStats,
   goalsForDate,
   showDatePicker,
   onToggleDatePicker,
@@ -1090,15 +1367,32 @@ function WeekProgressCard({
   selectedWeekStartDate: Date;
   selectedWeekEndDate: Date;
   weekDates: Date[];
-  completedCount: number;
-  totalCount: number;
-  progress: number;
+  overallProgressStats: GoalProgressStats;
+  flexibleProgressStats: GoalProgressStats;
+  strongProgressStats: GoalProgressStats;
   goalsForDate: (date: Date) => FirebaseDailyGoal[];
   showDatePicker: boolean;
   onToggleDatePicker: () => void;
   onPickDate: (date: Date) => void;
   onShowAIAnalysisNotice: () => void;
 }) {
+  const [progressFilter, setProgressFilter] =
+    useState<GoalProgressFilter>('overall');
+
+  const selectedProgressStats =
+    progressFilter === 'flexible'
+      ? flexibleProgressStats
+      : progressFilter === 'strong'
+        ? strongProgressStats
+        : overallProgressStats;
+
+  const progressTitle =
+    progressFilter === 'flexible'
+      ? 'Flexible Goal'
+      : progressFilter === 'strong'
+        ? 'Strong Goal'
+        : 'Overall Progress';
+
   return (
     <Card>
       <div className='flex items-center justify-between gap-3'>
@@ -1134,24 +1428,50 @@ function WeekProgressCard({
       </div>
 
       <div className='mt-5 flex items-center justify-between gap-4'>
-        <div>
-          <h2 className='text-[17px] font-semibold'>Overall Progress</h2>
+        <div className='min-w-0'>
+          <div className='relative inline-flex items-center'>
+            <h2 className='pr-7 text-[17px] font-semibold'>{progressTitle}</h2>
+
+            <select
+              value={progressFilter}
+              onChange={(event) =>
+                setProgressFilter(event.target.value as GoalProgressFilter)
+              }
+              className='absolute inset-0 h-full w-full cursor-pointer opacity-0'
+              aria-label='Progress type'
+            >
+              <option value='overall'>Overall Progress</option>
+              <option value='flexible'>Flexible Goal</option>
+              <option value='strong'>Strong Goal</option>
+            </select>
+
+            <ChevronDown
+              size={16}
+              strokeWidth={3}
+              className='pointer-events-none absolute right-0 text-gray-500'
+            />
+          </div>
 
           <p className='mt-1 text-[12px] text-gray-500'>
-            {completedCount} / {totalCount} completed
+            {selectedProgressStats.completedCount} /{' '}
+            {selectedProgressStats.totalCount} completed
           </p>
         </div>
 
         <div className='flex items-center gap-3'>
           <p className='text-[34px] font-bold leading-none text-blue-500'>
-            {Math.round(progress * 100)}%
+            {Math.round(selectedProgressStats.progress * 100)}%
           </p>
 
-          <CircularProgressRing progress={progress} />
+          <CircularProgressRing progress={selectedProgressStats.progress} />
         </div>
       </div>
 
-      <WeeklyProgressBars weekDates={weekDates} goalsForDate={goalsForDate} />
+      <WeeklyProgressBars
+        weekDates={weekDates}
+        goalsForDate={goalsForDate}
+        progressFilter={progressFilter}
+      />
     </Card>
   );
 }
@@ -1318,12 +1638,28 @@ function CircularProgressRing({ progress }: { progress: number }) {
 function WeeklyProgressBars({
   weekDates,
   goalsForDate,
+  progressFilter,
 }: {
   weekDates: Date[];
   goalsForDate: (date: Date) => FirebaseDailyGoal[];
+  progressFilter: GoalProgressFilter;
 }) {
+  function filteredGoalsForDate(date: Date) {
+    const goals = goalsForDate(date);
+
+    if (progressFilter === 'flexible') {
+      return goals.filter((goal) => goalKind(goal) === 'flexible');
+    }
+
+    if (progressFilter === 'strong') {
+      return goals.filter((goal) => goalKind(goal) === 'strong');
+    }
+
+    return goals;
+  }
+
   const maxGoalCount = Math.max(
-    ...weekDates.map((date) => goalsForDate(date).length),
+    ...weekDates.map((date) => filteredGoalsForDate(date).length),
     1,
   );
 
@@ -1333,7 +1669,7 @@ function WeeklyProgressBars({
   return (
     <div className='mt-5 flex items-end'>
       {weekDates.map((date) => {
-        const goals = goalsForDate(date);
+        const goals = filteredGoalsForDate(date);
         const total = goals.length;
         const completed = goals.filter((goal) => goal.isCompleted).length;
 
@@ -1614,6 +1950,54 @@ function DragHandle({ onMove }: { onMove: (direction: number) => void }) {
   );
 }
 
+function progressStatsForGoals(goals: FirebaseDailyGoal[]): GoalProgressStats {
+  const completedCount = goals.filter((goal) => goal.isCompleted).length;
+  const totalCount = goals.length;
+
+  return {
+    completedCount,
+    totalCount,
+    progress: totalCount === 0 ? 0 : completedCount / totalCount,
+  };
+}
+
+function shouldShowGoalDivider<T extends { kind?: GoalKind }>(
+  goals: T[],
+  index: number,
+) {
+  return index > 0 && goalKind(goals[index - 1]) !== goalKind(goals[index]);
+}
+
+function shouldShowDailyGoalDivider<
+  T extends { kind?: GoalKind; time?: string | null },
+>(goals: T[], index: number) {
+  if (index === 0) return false;
+
+  const previousGoal = goals[index - 1];
+  const currentGoal = goals[index];
+  const previousHasTime = Boolean(previousGoal.time);
+  const currentHasTime = Boolean(currentGoal.time);
+
+  if (previousHasTime !== currentHasTime) return true;
+  if (currentHasTime) return false;
+
+  return goalKind(previousGoal) !== goalKind(currentGoal);
+}
+
+function GoalDivider() {
+  return <div className='my-2 h-px bg-gray-100' aria-hidden='true' />;
+}
+
+function goalTitleClassName(isCompleted = false) {
+  if (isCompleted) return 'text-gray-400 line-through';
+  return 'text-black';
+}
+
+function goalTimeClassName(isCompleted = false) {
+  if (isCompleted) return 'text-gray-400';
+  return 'text-gray-500';
+}
+
 function GoalRow({
   title,
   showCopy = false,
@@ -1716,7 +2100,11 @@ function GoalRow({
 
   return (
     <div className='flex items-center gap-2 rounded-[14px] bg-white px-1 py-2.5'>
-      <p className='min-w-0 flex-1 text-[16px] text-black'>{title}</p>
+      <p
+        className={`min-w-0 flex-1 text-[16px] font-normal ${goalTitleClassName()}`}
+      >
+        {title}
+      </p>
 
       {showCopy && (
         <>
@@ -1744,40 +2132,233 @@ function GoalRow({
 
 function DailyGoalRow({
   goal,
+  canMove,
   onToggle,
   onMove,
+  onUpdateTimeReminder,
   onDelete,
 }: {
   goal: FirebaseDailyGoal;
+  canMove: boolean;
   onToggle: () => void;
   onMove: (direction: number) => void;
+  onUpdateTimeReminder: (time: string | null, reminder: GoalReminder) => void;
   onDelete: () => void;
 }) {
+  const [showTimeModal, setShowTimeModal] = useState(false);
+
   return (
-    <div className='flex items-center gap-2 rounded-[14px] bg-white px-1 py-2.5'>
-      <button onClick={onToggle} className='text-blue-500'>
-        {goal.isCompleted ? (
-          <span className='flex h-[23px] w-[23px] items-center justify-center rounded-full bg-blue-500 text-white'>
-            <Check size={15} strokeWidth={3} />
-          </span>
+    <>
+      <div className='flex items-center gap-2 rounded-[14px] bg-white px-1 py-2.5'>
+        <button onClick={onToggle} className='text-blue-500'>
+          {goal.isCompleted ? (
+            <span className='flex h-[23px] w-[23px] items-center justify-center rounded-full bg-blue-500 text-white'>
+              <Check size={15} strokeWidth={3} />
+            </span>
+          ) : (
+            <Circle size={23} className='text-gray-400' />
+          )}
+        </button>
+
+        <p
+          className={`min-w-0 flex-1 text-[16px] font-normal ${goalTitleClassName(
+            goal.isCompleted,
+          )}`}
+        >
+          {goal.time && (
+            <span
+              className={`mr-1.5 tabular-nums ${goalTimeClassName(goal.isCompleted)}`}
+            >
+              {goal.time}
+            </span>
+          )}
+          {goal.title}
+        </p>
+
+        <button
+          type='button'
+          onClick={() => setShowTimeModal(true)}
+          className='flex h-8 w-8 items-center justify-center rounded-full text-gray-400 active:bg-gray-100'
+          aria-label='Set time and reminder'
+        >
+          <Clock size={17} />
+        </button>
+
+        {canMove ? (
+          <DragHandle onMove={onMove} />
         ) : (
-          <Circle size={23} className='text-gray-400' />
+          <button
+            type='button'
+            disabled
+            className='flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full opacity-30'
+            aria-label='Timed goals are sorted by time'
+          >
+            <span className='flex flex-col items-center justify-center gap-[3px]'>
+              <span className='h-[1.5px] w-[17px] rounded-full bg-gray-400' />
+              <span className='h-[1.5px] w-[17px] rounded-full bg-gray-400' />
+              <span className='h-[1.5px] w-[17px] rounded-full bg-gray-400' />
+            </span>
+          </button>
         )}
-      </button>
 
-      <p
-        className={`min-w-0 flex-1 text-[16px] ${
-          goal.isCompleted ? 'text-gray-500 line-through' : 'text-black'
-        }`}
+        {goalKind(goal) === 'strong' ? (
+          <button
+            type='button'
+            disabled
+            className='cursor-not-allowed p-1 text-gray-300'
+            aria-label='Strong goals cannot be deleted'
+          >
+            <Trash size={18} />
+          </button>
+        ) : (
+          <button onClick={onDelete} className='p-1 text-red-500'>
+            <Trash size={18} />
+          </button>
+        )}
+      </div>
+
+      {showTimeModal &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <TimeReminderModal
+            initialTime={goal.time ?? null}
+            initialReminder={goal.reminder ?? 'none'}
+            onClose={() => setShowTimeModal(false)}
+            onConfirm={(time, reminder) => {
+              onUpdateTimeReminder(time, reminder);
+              setShowTimeModal(false);
+            }}
+          />,
+          document.body,
+        )}
+    </>
+  );
+}
+
+function TimeReminderModal({
+  initialTime,
+  initialReminder,
+  onClose,
+  onConfirm,
+}: {
+  initialTime: string | null;
+  initialReminder: GoalReminder;
+  onClose: () => void;
+  onConfirm: (time: string | null, reminder: GoalReminder) => void;
+}) {
+  const [selectedHour, setSelectedHour] = useState<string | null>(
+    initialTime?.split(':')[0] ?? null,
+  );
+  const [selectedMinute, setSelectedMinute] = useState<string | null>(
+    initialTime?.split(':')[1] ?? null,
+  );
+  const [reminder, setReminder] = useState<GoalReminder>(initialReminder);
+
+  const selectedTime =
+    selectedHour && selectedMinute ? `${selectedHour}:${selectedMinute}` : null;
+
+  useEffect(() => {
+    if (!selectedTime) {
+      setReminder('none');
+    }
+  }, [selectedTime]);
+
+  return (
+    <div
+      onClick={onClose}
+      className='fixed inset-0 z-[9999] flex items-end justify-center bg-black/30 p-4'
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        className='w-full max-w-md rounded-[24px] bg-white p-6'
       >
-        {goal.title}
-      </p>
+        <div className='space-y-4'>
+          <h2 className='text-center text-[22px] font-bold'>Time & Reminder</h2>
 
-      <DragHandle onMove={onMove} />
+          <p className='text-center text-[14px] text-gray-500'>
+            Set a time and reminder for this daily goal.
+          </p>
 
-      <button onClick={onDelete} className='p-1 text-red-500'>
-        <Trash size={18} />
-      </button>
+          <select
+            value={selectedHour ?? ''}
+            onChange={(event) => setSelectedHour(event.target.value || null)}
+            className='w-full rounded-[14px] bg-[#f2f2f7] p-4 text-[16px] font-semibold outline-none'
+          >
+            <option value=''>Hour</option>
+            {Array.from({ length: 24 }, (_, hour) => {
+              const value = `${hour}`.padStart(2, '0');
+
+              return (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              );
+            })}
+          </select>
+
+          <select
+            value={selectedMinute ?? ''}
+            onChange={(event) => setSelectedMinute(event.target.value || null)}
+            className='w-full rounded-[14px] bg-[#f2f2f7] p-4 text-[16px] font-semibold outline-none'
+          >
+            <option value=''>Minute</option>
+            {Array.from({ length: 60 }, (_, minute) => {
+              const value = `${minute}`.padStart(2, '0');
+
+              return (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              );
+            })}
+          </select>
+
+          <select
+            value={reminder}
+            disabled={!selectedTime}
+            onChange={(event) =>
+              setReminder(event.target.value as GoalReminder)
+            }
+            className={`w-full rounded-[14px] bg-[#f2f2f7] p-4 text-[16px] outline-none ${
+              !selectedTime ? 'cursor-not-allowed text-gray-300' : ''
+            }`}
+          >
+            <option value='none'>No reminder</option>
+            <option value='atTime'>At event time</option>
+            <option value='5m'>5 minutes before</option>
+            <option value='10m'>10 minutes before</option>
+            <option value='15m'>15 minutes before</option>
+            <option value='30m'>30 minutes before</option>
+            <option value='1h'>1 hour before</option>
+            <option value='1d'>1 day before</option>
+          </select>
+
+          <p className='text-center text-[13px] text-gray-400'>
+            {selectedTime ? `${selectedTime} selected` : 'No time selected'}
+          </p>
+
+          <button
+            onClick={() =>
+              onConfirm(selectedTime, selectedTime ? reminder : 'none')
+            }
+            className='w-full rounded-[16px] bg-blue-500 p-4 font-semibold text-white'
+          >
+            Save
+          </button>
+
+          <button
+            type='button'
+            onClick={() => {
+              setSelectedHour(null);
+              setSelectedMinute(null);
+              setReminder('none');
+            }}
+            className='w-full text-[14px] font-medium text-gray-500'
+          >
+            Clear time
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

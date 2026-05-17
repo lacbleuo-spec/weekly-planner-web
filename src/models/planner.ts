@@ -1,6 +1,16 @@
-// planner
-
 import { Timestamp } from 'firebase/firestore';
+
+export type GoalKind = 'schedule' | 'strong' | 'flexible';
+
+export type GoalReminder =
+  | 'none'
+  | 'atTime'
+  | '5m'
+  | '10m'
+  | '15m'
+  | '30m'
+  | '1h'
+  | '1d';
 
 export type FirebaseWeeklyPlan = {
   id: string;
@@ -16,6 +26,9 @@ export type FirebaseWeeklyPlan = {
 export type FirebaseWeeklyGoal = {
   id: string;
   title: string;
+  kind?: GoalKind;
+  time?: string | null;
+  reminder?: GoalReminder;
   order: number;
   createdAt: Timestamp;
   updatedAt?: Timestamp | null;
@@ -27,6 +40,9 @@ export type FirebaseDailyGoal = {
   title: string;
   date: Timestamp;
   isCompleted: boolean;
+  kind?: GoalKind;
+  time?: string | null;
+  reminder?: GoalReminder;
   order: number;
   createdAt: Timestamp;
   updatedAt?: Timestamp | null;
