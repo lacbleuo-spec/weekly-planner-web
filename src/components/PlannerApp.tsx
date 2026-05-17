@@ -220,6 +220,7 @@ function upsertPlan(
 
 export default function PlannerApp() {
   const auth = useAuth();
+  const wasDesktopRef = useRef<boolean | null>(null);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -357,6 +358,9 @@ export default function PlannerApp() {
     function syncExpandedDaysForScreenSize() {
       const isDesktop = window.matchMedia('(min-width: 1280px)').matches;
 
+      if (wasDesktopRef.current === isDesktop) return;
+      wasDesktopRef.current = isDesktop;
+
       if (isDesktop) {
         setExpandedDayKeys(new Set(weekDates.map(dayKey)));
         return;
@@ -371,10 +375,11 @@ export default function PlannerApp() {
 
     syncExpandedDaysForScreenSize();
 
-    window.addEventListener('resize', syncExpandedDaysForScreenSize);
+    const mediaQuery = window.matchMedia('(min-width: 1280px)');
+    mediaQuery.addEventListener('change', syncExpandedDaysForScreenSize);
 
     return () => {
-      window.removeEventListener('resize', syncExpandedDaysForScreenSize);
+      mediaQuery.removeEventListener('change', syncExpandedDaysForScreenSize);
     };
   }, [weekDates]);
 
@@ -975,10 +980,7 @@ export default function PlannerApp() {
 
           return (
             <Card>
-              <button
-                onClick={() => toggleDay(date)}
-                className='flex w-full items-center justify-between'
-              >
+              <div className='flex w-full items-center justify-between'>
                 <div className='text-left'>
                   <h2 className='text-[17px] font-semibold'>
                     {englishWeekdayText(date)}
@@ -993,13 +995,20 @@ export default function PlannerApp() {
                     {done}/{goals.length}
                   </p>
 
-                  {isExpanded ? (
-                    <ChevronUp size={18} className='text-gray-500' />
-                  ) : (
-                    <ChevronDown size={18} className='text-gray-500' />
-                  )}
+                  <button
+                    type='button'
+                    onClick={() => toggleDay(date)}
+                    className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
+                    aria-label={isExpanded ? 'Collapse day' : 'Expand day'}
+                  >
+                    {isExpanded ? (
+                      <ChevronUp size={18} />
+                    ) : (
+                      <ChevronDown size={18} />
+                    )}
+                  </button>
                 </div>
-              </button>
+              </div>
 
               {isExpanded && (
                 <div className='mt-4 space-y-2.5'>
@@ -1495,21 +1504,21 @@ function ExpandableCard({
 }) {
   return (
     <Card>
-      <button
-        onClick={onToggle}
-        className='flex w-full items-center justify-between'
-      >
+      <div className='flex w-full items-center justify-between'>
         <div className='text-left'>
           <h2 className='text-[17px] font-semibold'>{title}</h2>
           <p className='mt-1 text-[12px] text-gray-500'>{subtitle}</p>
         </div>
 
-        {expanded ? (
-          <ChevronUp size={18} className='text-gray-500' />
-        ) : (
-          <ChevronDown size={18} className='text-gray-500' />
-        )}
-      </button>
+        <button
+          type='button'
+          onClick={onToggle}
+          className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
+          aria-label={expanded ? 'Collapse section' : 'Expand section'}
+        >
+          {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </button>
+      </div>
 
       {expanded && <div className='mt-4 space-y-2.5'>{children}</div>}
     </Card>
