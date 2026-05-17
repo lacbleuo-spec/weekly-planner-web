@@ -58,8 +58,8 @@ const IOS_APP_STORE_URL =
 
 const GOAL_KIND_ORDER = {
   schedule: 0,
-  flexible: 1,
-  strong: 2,
+  strong: 1,
+  flexible: 2,
 } satisfies Record<GoalKind, number>;
 
 const STRONG_GOAL_NOTICE =
