@@ -1624,8 +1624,9 @@ function LockGoalModal({
             <p className='mt-3 text-[15px] leading-6 text-gray-500'>
               Locked goals cannot be deleted.
               <br />
-              Locking important goals can help you stay committed and follow
-              through.
+              Use this after you&apos;ve finished planning.
+              <br />
+              Locked goals can help you stay committed and follow through.
             </p>
           </div>
 
