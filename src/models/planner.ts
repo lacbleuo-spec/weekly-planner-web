@@ -1,6 +1,8 @@
+// planner
+
 import { Timestamp } from 'firebase/firestore';
 
-export type GoalKind = 'schedule' | 'strong' | 'flexible';
+export type GoalKind = 'schedule' | 'deletable' | 'nonDeletable';
 
 export type GoalReminder =
   | 'none'
