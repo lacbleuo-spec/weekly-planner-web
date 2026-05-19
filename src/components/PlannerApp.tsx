@@ -133,6 +133,16 @@ function now() {
   return Timestamp.now();
 }
 
+function isPastDay(date: Date) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const targetDate = new Date(date);
+  targetDate.setHours(0, 0, 0, 0);
+
+  return targetDate < today;
+}
+
 function goalKind(goal: { kind?: GoalKind | LegacyGoalKind }) {
   if (goal.kind === 'flexible') return 'deletable';
   if (goal.kind === 'strong') return 'nonDeletable';
@@ -837,6 +847,7 @@ export default function PlannerApp() {
       (goal) => goal.id === goalId,
     );
     if (!targetGoal) return;
+    if (isPastDay(targetGoal.date.toDate())) return;
 
     const updatedGoal = {
       ...targetGoal,
@@ -1088,8 +1099,8 @@ export default function PlannerApp() {
                     title={goal.title}
                     showCopy
                     weekDates={weekDates}
-                    onCopyToDay={(date) =>
-                      copyWeeklyGoalToDailyGoal(goal, [date])
+                    onCopyToDays={(dates) =>
+                      copyWeeklyGoalToDailyGoal(goal, dates)
                     }
                     onCopyToAllDays={() =>
                       copyWeeklyGoalToDailyGoal(goal, weekDates)
@@ -1165,6 +1176,7 @@ export default function PlannerApp() {
                       <DailyGoalRow
                         goal={goal}
                         canMove={true}
+                        canToggle={!isPastDay(goal.date.toDate())}
                         onToggle={() => toggleDailyGoal(goal.id)}
                         onMove={(direction) =>
                           moveDailyGoal(goal.id, date, direction)
@@ -1922,7 +1934,7 @@ function GoalRow({
   title,
   showCopy = false,
   weekDates = [],
-  onCopyToDay,
+  onCopyToDays,
   onCopyToAllDays,
   onCopyToWeekdays,
   onCopyToNextWeek,
@@ -1932,7 +1944,7 @@ function GoalRow({
   title: string;
   showCopy?: boolean;
   weekDates?: Date[];
-  onCopyToDay?: (date: Date) => void;
+  onCopyToDays?: (dates: Date[]) => void;
   onCopyToAllDays?: () => void;
   onCopyToWeekdays?: () => void;
   onCopyToNextWeek?: () => void;
@@ -1940,10 +1952,45 @@ function GoalRow({
   onDelete: () => void;
 }) {
   const [isCopyMenuOpen, setIsCopyMenuOpen] = useState(false);
+  const [selectedCopyDayKeys, setSelectedCopyDayKeys] = useState<Set<string>>(
+    new Set(),
+  );
+
+  function closeCopyMenu() {
+    setSelectedCopyDayKeys(new Set());
+    setIsCopyMenuOpen(false);
+  }
 
   function handleCopy(action: () => void) {
     action();
-    setIsCopyMenuOpen(false);
+    closeCopyMenu();
+  }
+
+  function toggleCopyDate(date: Date) {
+    const key = dayKey(date);
+
+    setSelectedCopyDayKeys((prev) => {
+      const next = new Set(prev);
+
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+
+      return next;
+    });
+  }
+
+  function confirmCopyToSelectedDays() {
+    if (!onCopyToDays || selectedCopyDayKeys.size === 0) return;
+
+    const selectedDates = weekDates.filter((date) =>
+      selectedCopyDayKeys.has(dayKey(date)),
+    );
+
+    onCopyToDays(selectedDates);
+    closeCopyMenu();
   }
 
   const copyMenu =
@@ -1953,7 +2000,7 @@ function GoalRow({
             <button
               type='button'
               aria-label='Close copy menu'
-              onClick={() => setIsCopyMenuOpen(false)}
+              onClick={closeCopyMenu}
               className='absolute inset-0 z-0 cursor-default'
             />
 
@@ -1966,24 +2013,81 @@ function GoalRow({
                   </p>
                 </div>
 
-                <div className='grid grid-cols-2 gap-2'>
-                  {weekDates.map((date) => (
-                    <button
-                      key={dayKey(date)}
-                      type='button'
-                      onClick={() =>
-                        onCopyToDay && handleCopy(() => onCopyToDay(date))
-                      }
-                      className='rounded-[16px] bg-[#f2f2f7] px-4 py-3 text-left active:scale-[0.98]'
-                    >
-                      <p className='text-[15px] font-semibold text-black'>
-                        {englishWeekdayText(date)}
-                      </p>
-                      <p className='mt-0.5 text-[12px] text-gray-500'>
-                        {monthDayText(date)}
-                      </p>
-                    </button>
-                  ))}
+                <div className='space-y-2'>
+                  <div className='grid grid-cols-2 gap-2'>
+                    {weekDates.slice(0, 6).map((date) => {
+                      const selected = selectedCopyDayKeys.has(dayKey(date));
+
+                      return (
+                        <button
+                          key={dayKey(date)}
+                          type='button'
+                          onClick={() => toggleCopyDate(date)}
+                          className={`rounded-[16px] px-4 py-3 text-left active:scale-[0.98] ${
+                            selected
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-[#f2f2f7] text-black'
+                          }`}
+                        >
+                          <p className='text-[15px] font-semibold'>
+                            {englishWeekdayText(date)}
+                          </p>
+                          <p
+                            className={`mt-0.5 text-[12px] ${
+                              selected ? 'text-blue-100' : 'text-gray-500'
+                            }`}
+                          >
+                            {monthDayText(date)}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {weekDates[6] && (
+                    <div className='flex gap-2'>
+                      {(() => {
+                        const date = weekDates[6];
+                        const selected = selectedCopyDayKeys.has(dayKey(date));
+
+                        return (
+                          <button
+                            type='button'
+                            onClick={() => toggleCopyDate(date)}
+                            className={`min-w-0 flex-1 rounded-[16px] px-4 py-3 text-left active:scale-[0.98] ${
+                              selected
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-[#f2f2f7] text-black'
+                            }`}
+                          >
+                            <p className='text-[15px] font-semibold'>
+                              {englishWeekdayText(date)}
+                            </p>
+                            <p
+                              className={`mt-0.5 text-[12px] ${
+                                selected ? 'text-blue-100' : 'text-gray-500'
+                              }`}
+                            >
+                              {monthDayText(date)}
+                            </p>
+                          </button>
+                        );
+                      })()}
+
+                      <button
+                        type='button'
+                        onClick={confirmCopyToSelectedDays}
+                        disabled={selectedCopyDayKeys.size === 0}
+                        className={`w-[92px] rounded-[16px] text-[15px] font-semibold active:scale-[0.98] ${
+                          selectedCopyDayKeys.size === 0
+                            ? 'cursor-not-allowed bg-gray-200 text-gray-400'
+                            : 'bg-blue-500 text-white'
+                        }`}
+                      >
+                        Confirm
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className='grid grid-cols-2 gap-2'>
@@ -2068,6 +2172,7 @@ function GoalRow({
 function DailyGoalRow({
   goal,
   canMove,
+  canToggle,
   onToggle,
   onMove,
   onUpdateTimeReminder,
@@ -2076,6 +2181,7 @@ function DailyGoalRow({
 }: {
   goal: FirebaseDailyGoal;
   canMove: boolean;
+  canToggle: boolean;
   onToggle: () => void;
   onMove: (direction: number) => void;
   onUpdateTimeReminder: (time: string | null, reminder: GoalReminder) => void;
@@ -2087,7 +2193,17 @@ function DailyGoalRow({
   return (
     <>
       <div className='flex items-center gap-2 rounded-[14px] bg-white px-1 py-2.5'>
-        <button onClick={onToggle} className='text-blue-500'>
+        <button
+          type='button'
+          onClick={onToggle}
+          disabled={!canToggle}
+          className={`text-blue-500 ${
+            !canToggle ? 'cursor-not-allowed opacity-40' : ''
+          }`}
+          aria-label={
+            canToggle ? 'Toggle goal' : 'Past goals cannot be checked'
+          }
+        >
           {goal.isCompleted ? (
             <span className='flex h-[23px] w-[23px] items-center justify-center rounded-full bg-blue-500 text-white'>
               <Check size={15} strokeWidth={3} />
