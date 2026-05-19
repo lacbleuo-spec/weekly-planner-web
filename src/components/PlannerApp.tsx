@@ -1105,9 +1105,6 @@ export default function PlannerApp() {
                     onCopyToAllDays={() =>
                       copyWeeklyGoalToDailyGoal(goal, weekDates)
                     }
-                    onCopyToWeekdays={() =>
-                      copyWeeklyGoalToDailyGoal(goal, weekDates.slice(0, 5))
-                    }
                     onCopyToNextWeek={() => copyWeeklyGoalToNextWeek(goal)}
                     onMove={(direction) => moveWeeklyGoal(goal.id, direction)}
                     onDelete={() => deleteWeeklyGoal(goal.id)}
@@ -1936,7 +1933,6 @@ function GoalRow({
   weekDates = [],
   onCopyToDays,
   onCopyToAllDays,
-  onCopyToWeekdays,
   onCopyToNextWeek,
   onMove,
   onDelete,
@@ -1946,7 +1942,6 @@ function GoalRow({
   weekDates?: Date[];
   onCopyToDays?: (dates: Date[]) => void;
   onCopyToAllDays?: () => void;
-  onCopyToWeekdays?: () => void;
   onCopyToNextWeek?: () => void;
   onMove: (direction: number) => void;
   onDelete: () => void;
@@ -2013,9 +2008,9 @@ function GoalRow({
                   </p>
                 </div>
 
-                <div className='space-y-2'>
+                <div className='space-y-3'>
                   <div className='grid grid-cols-2 gap-2'>
-                    {weekDates.slice(0, 6).map((date) => {
+                    {weekDates.map((date) => {
                       const selected = selectedCopyDayKeys.has(dayKey(date));
 
                       return (
@@ -2043,63 +2038,22 @@ function GoalRow({
                       );
                     })}
                   </div>
-
-                  {weekDates[6] && (
-                    <div className='flex gap-2'>
-                      {(() => {
-                        const date = weekDates[6];
-                        const selected = selectedCopyDayKeys.has(dayKey(date));
-
-                        return (
-                          <button
-                            type='button'
-                            onClick={() => toggleCopyDate(date)}
-                            className={`min-w-0 flex-1 rounded-[16px] px-4 py-3 text-left active:scale-[0.98] ${
-                              selected
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-[#f2f2f7] text-black'
-                            }`}
-                          >
-                            <p className='text-[15px] font-semibold'>
-                              {englishWeekdayText(date)}
-                            </p>
-                            <p
-                              className={`mt-0.5 text-[12px] ${
-                                selected ? 'text-blue-100' : 'text-gray-500'
-                              }`}
-                            >
-                              {monthDayText(date)}
-                            </p>
-                          </button>
-                        );
-                      })()}
-
-                      <button
-                        type='button'
-                        onClick={confirmCopyToSelectedDays}
-                        disabled={selectedCopyDayKeys.size === 0}
-                        className={`w-[92px] rounded-[16px] text-[15px] font-semibold active:scale-[0.98] ${
-                          selectedCopyDayKeys.size === 0
-                            ? 'cursor-not-allowed bg-gray-200 text-gray-400'
-                            : 'bg-blue-500 text-white'
-                        }`}
-                      >
-                        Confirm
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 <div className='grid grid-cols-2 gap-2'>
                   <button
                     type='button'
-                    onClick={() =>
-                      onCopyToWeekdays && handleCopy(onCopyToWeekdays)
-                    }
-                    className='rounded-[16px] bg-blue-500 p-4 text-left active:scale-[0.99]'
+                    onClick={confirmCopyToSelectedDays}
+                    disabled={selectedCopyDayKeys.size === 0}
+                    className={`rounded-[16px] p-4 text-left active:scale-[0.99] ${
+                      selectedCopyDayKeys.size === 0
+                        ? 'cursor-not-allowed bg-gray-200 text-gray-400'
+                        : 'bg-blue-50 text-blue-500'
+                    }`}
                   >
-                    <span className='block font-semibold text-white'>
-                      Weekdays
+                    <span className='block font-semibold'>
+                      Copy to {selectedCopyDayKeys.size} day
+                      {selectedCopyDayKeys.size === 1 ? '' : 's'}
                     </span>
                   </button>
 
@@ -2111,7 +2065,7 @@ function GoalRow({
                     className='rounded-[16px] bg-blue-500 p-4 text-left active:scale-[0.99]'
                   >
                     <span className='block font-semibold text-white'>
-                      All days
+                      Copy to all days
                     </span>
                   </button>
                 </div>
