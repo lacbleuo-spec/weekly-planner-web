@@ -1922,8 +1922,9 @@ function GoalDivider() {
   return <div className='my-2 h-px bg-gray-100' aria-hidden='true' />;
 }
 
-function goalTitleClassName(isCompleted = false) {
+function goalTitleClassName(isCompleted = false, isDisabled = false) {
   if (isCompleted) return 'text-gray-400 line-through';
+  if (isDisabled) return 'text-gray-400';
   return 'text-black';
 }
 
@@ -2170,6 +2171,7 @@ function DailyGoalRow({
         <p
           className={`min-w-0 flex-1 text-[16px] font-normal ${goalTitleClassName(
             goal.isCompleted,
+            !canToggle,
           )}`}
         >
           {goal.time && (
