@@ -1990,24 +1990,24 @@ function GoalRow({
                   <button
                     type='button'
                     onClick={() =>
-                      onCopyToAllDays && handleCopy(onCopyToAllDays)
+                      onCopyToWeekdays && handleCopy(onCopyToWeekdays)
                     }
                     className='rounded-[16px] bg-blue-500 p-4 text-left active:scale-[0.99]'
                   >
                     <span className='block font-semibold text-white'>
-                      Copy to all days
+                      Weekdays
                     </span>
                   </button>
 
                   <button
                     type='button'
                     onClick={() =>
-                      onCopyToWeekdays && handleCopy(onCopyToWeekdays)
+                      onCopyToAllDays && handleCopy(onCopyToAllDays)
                     }
                     className='rounded-[16px] bg-blue-500 p-4 text-left active:scale-[0.99]'
                   >
                     <span className='block font-semibold text-white'>
-                      Copy to weekdays
+                      All days
                     </span>
                   </button>
                 </div>
