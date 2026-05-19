@@ -2043,29 +2043,29 @@ function GoalRow({
                 <div className='grid grid-cols-2 gap-2'>
                   <button
                     type='button'
-                    onClick={confirmCopyToSelectedDays}
-                    disabled={selectedCopyDayKeys.size === 0}
-                    className={`rounded-[16px] p-4 text-left active:scale-[0.99] ${
-                      selectedCopyDayKeys.size === 0
-                        ? 'cursor-not-allowed bg-gray-200 text-gray-400'
-                        : 'bg-blue-50 text-blue-500'
-                    }`}
+                    onClick={() =>
+                      onCopyToAllDays && handleCopy(onCopyToAllDays)
+                    }
+                    className='rounded-[16px] bg-blue-50 p-4 text-left text-blue-500 active:scale-[0.99]'
                   >
                     <span className='block font-semibold'>
-                      Copy to {selectedCopyDayKeys.size} day
-                      {selectedCopyDayKeys.size === 1 ? '' : 's'}
+                      Copy to all days
                     </span>
                   </button>
 
                   <button
                     type='button'
-                    onClick={() =>
-                      onCopyToAllDays && handleCopy(onCopyToAllDays)
-                    }
-                    className='rounded-[16px] bg-blue-500 p-4 text-left active:scale-[0.99]'
+                    onClick={confirmCopyToSelectedDays}
+                    disabled={selectedCopyDayKeys.size === 0}
+                    className={`rounded-[16px] p-4 text-left active:scale-[0.99] ${
+                      selectedCopyDayKeys.size === 0
+                        ? 'cursor-not-allowed bg-gray-200 text-gray-400'
+                        : 'bg-blue-500 text-white'
+                    }`}
                   >
-                    <span className='block font-semibold text-white'>
-                      Copy to all days
+                    <span className='block font-semibold'>
+                      Copy to {selectedCopyDayKeys.size} day
+                      {selectedCopyDayKeys.size === 1 ? '' : 's'}
                     </span>
                   </button>
                 </div>
