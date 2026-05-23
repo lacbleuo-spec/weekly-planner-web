@@ -2231,13 +2231,13 @@ function GoalLabelSelect({
   label?: string | null;
   onChange?: (label: string | null) => void;
 }) {
-  const value = normalizeGoalLabel(label) ?? 'A';
+  const value = normalizeGoalLabel(label ?? null) ?? 'A';
 
   return (
     <div className='relative shrink-0'>
       <select
         value={value}
-        onChange={(event) => onChange?.(event.target.value)}
+        onChange={(event) => onChange?.(event.target.value ?? null)}
         className='h-7 min-w-7 appearance-none rounded-full bg-blue-50 px-2 text-center text-[12px] font-bold text-blue-500 outline-none'
         aria-label='Goal label'
       >
