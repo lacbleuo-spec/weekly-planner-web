@@ -150,8 +150,29 @@ function goalKind(goal: { kind?: GoalKind | LegacyGoalKind }) {
   return goal.kind ?? 'deletable';
 }
 
-function sortGoalsByKindAndOrder<T extends { order: number }>(goals: T[]) {
-  return [...goals].sort((a, b) => a.order - b.order);
+function goalLabel(goal: { label?: string | null }) {
+  return goal.label?.trim().toUpperCase() || 'A';
+}
+
+function normalizeGoalLabel(label: string | null) {
+  const normalized = label?.trim().toUpperCase() ?? '';
+
+  return /^[A-Z]$/.test(normalized) ? normalized : null;
+}
+
+function sortGoalsByLabelAndOrder<
+  T extends {
+    label?: string | null;
+    order: number;
+  },
+>(goals: T[]) {
+  return [...goals].sort((a, b) => {
+    const labelDiff = goalLabel(a).localeCompare(goalLabel(b));
+
+    if (labelDiff !== 0) return labelDiff;
+
+    return a.order - b.order;
+  });
 }
 
 function storeTimestamp(timestamp?: Timestamp | null): StoredTimestamp | null {
@@ -256,7 +277,6 @@ function upsertPlan(
 
 export default function PlannerApp() {
   const auth = useAuth();
-  const wasDesktopRef = useRef<boolean | null>(null);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -372,7 +392,7 @@ export default function PlannerApp() {
   }, [weeklyPlans, selectedWeekStartDate]);
 
   const weeklyGoals = useMemo(() => {
-    return sortGoalsByKindAndOrder(
+    return sortGoalsByLabelAndOrder(
       currentPlan?.weeklyGoals.filter((goal) => !goal.deletedAt) ?? [],
     );
   }, [currentPlan]);
@@ -403,9 +423,9 @@ export default function PlannerApp() {
   );
 
   const visibleSomedayGoals = useMemo(() => {
-    return somedayGoals
-      .filter((goal) => !goal.deletedAt)
-      .sort((a, b) => a.order - b.order);
+    return sortGoalsByLabelAndOrder(
+      somedayGoals.filter((goal) => !goal.deletedAt),
+    );
   }, [somedayGoals]);
 
   useEffect(() => {
@@ -581,13 +601,6 @@ export default function PlannerApp() {
       addingDays(nextWeekStartDate, i),
     );
 
-    const isDesktop = window.matchMedia('(min-width: 1280px)').matches;
-
-    if (isDesktop) {
-      setExpandedDayKeys(new Set(dates.map(dayKey)));
-      return;
-    }
-
     if (dates.some((date) => isSameDay(date, new Date()))) {
       setExpandedDayKeys(new Set([dayKey(new Date())]));
     } else {
@@ -610,6 +623,7 @@ export default function PlannerApp() {
     const goal: FirebaseSomedayGoal = {
       id: makeId(),
       title: text,
+      label: 'A',
       order: visibleSomedayGoals.length,
       createdAt: now(),
       updatedAt: now(),
@@ -633,15 +647,28 @@ export default function PlannerApp() {
   }
 
   function moveSomedayGoal(goalId: string, direction: number) {
-    const goals = [...visibleSomedayGoals];
-    const currentIndex = goals.findIndex((goal) => goal.id === goalId);
+    const target = visibleSomedayGoals.find((goal) => goal.id === goalId);
+
+    if (!target) return;
+
+    const sameLabelGoals = visibleSomedayGoals.filter(
+      (goal) => goalLabel(goal) === goalLabel(target),
+    );
+
+    const currentIndex = sameLabelGoals.findIndex((goal) => goal.id === goalId);
     const newIndex = currentIndex + direction;
 
-    if (currentIndex < 0 || newIndex < 0 || newIndex >= goals.length) return;
+    if (currentIndex < 0 || newIndex < 0 || newIndex >= sameLabelGoals.length) {
+      return;
+    }
 
-    goals.splice(newIndex, 0, goals.splice(currentIndex, 1)[0]);
+    sameLabelGoals.splice(
+      newIndex,
+      0,
+      sameLabelGoals.splice(currentIndex, 1)[0],
+    );
 
-    const reorderedGoals = goals.map((goal, index) => ({
+    const reorderedGoals = sameLabelGoals.map((goal, index) => ({
       ...goal,
       order: index,
       updatedAt: now(),
@@ -654,6 +681,24 @@ export default function PlannerApp() {
     syncSomedayGoalsChange(nextGoals, reorderedGoals);
   }
 
+  function updateSomedayGoalLabel(goalId: string, label: string | null) {
+    const target = somedayGoals.find((goal) => goal.id === goalId);
+
+    if (!target) return;
+
+    const updatedGoal = {
+      ...target,
+      label: normalizeGoalLabel(label),
+      updatedAt: now(),
+    };
+
+    const nextGoals = somedayGoals.map((goal) =>
+      goal.id === goalId ? updatedGoal : goal,
+    );
+
+    syncSomedayGoalChange(nextGoals, updatedGoal);
+  }
+
   function addWeeklyGoal() {
     const text = newWeeklyGoalText.trim();
     if (!text) return;
@@ -664,6 +709,7 @@ export default function PlannerApp() {
     const goal: FirebaseWeeklyGoal = {
       id: makeId(),
       title: text,
+      label: 'A',
       time: null,
       reminder: 'none',
       order: weeklyGoals.length,
@@ -706,15 +752,28 @@ export default function PlannerApp() {
   function moveWeeklyGoal(goalId: string, direction: number) {
     if (!currentPlan) return;
 
-    const goals = weeklyGoals;
-    const currentIndex = goals.findIndex((goal) => goal.id === goalId);
+    const target = weeklyGoals.find((goal) => goal.id === goalId);
+
+    if (!target) return;
+
+    const sameLabelGoals = weeklyGoals.filter(
+      (goal) => goalLabel(goal) === goalLabel(target),
+    );
+
+    const currentIndex = sameLabelGoals.findIndex((goal) => goal.id === goalId);
     const newIndex = currentIndex + direction;
 
-    if (currentIndex < 0 || newIndex < 0 || newIndex >= goals.length) return;
+    if (currentIndex < 0 || newIndex < 0 || newIndex >= sameLabelGoals.length) {
+      return;
+    }
 
-    goals.splice(newIndex, 0, goals.splice(currentIndex, 1)[0]);
+    sameLabelGoals.splice(
+      newIndex,
+      0,
+      sameLabelGoals.splice(currentIndex, 1)[0],
+    );
 
-    const reorderedGoals = goals.map((goal, index) => ({
+    const reorderedGoals = sameLabelGoals.map((goal, index) => ({
       ...goal,
       order: index,
       updatedAt: now(),
@@ -731,10 +790,34 @@ export default function PlannerApp() {
     syncWeeklyGoalsChange(updatedPlan, reorderedGoals);
   }
 
+  function updateWeeklyGoalLabel(goalId: string, label: string | null) {
+    if (!currentPlan) return;
+
+    const target = currentPlan.weeklyGoals.find((goal) => goal.id === goalId);
+
+    if (!target) return;
+
+    const updatedGoal = {
+      ...target,
+      label: normalizeGoalLabel(label),
+      updatedAt: now(),
+    };
+
+    const updatedPlan = {
+      ...currentPlan,
+      updatedAt: now(),
+      weeklyGoals: currentPlan.weeklyGoals.map((goal) =>
+        goal.id === goalId ? updatedGoal : goal,
+      ),
+    };
+
+    syncWeeklyGoalChange(updatedPlan, updatedGoal);
+  }
+
   function goalsForDate(date: Date) {
-    return allGoals
-      .filter((goal) => isSameDay(goal.date.toDate(), date))
-      .sort((a, b) => a.order - b.order);
+    return sortGoalsByLabelAndOrder(
+      allGoals.filter((goal) => isSameDay(goal.date.toDate(), date)),
+    );
   }
 
   function copyWeeklyGoalToDailyGoal(goal: FirebaseWeeklyGoal, dates: Date[]) {
@@ -744,6 +827,7 @@ export default function PlannerApp() {
     const newGoals: FirebaseDailyGoal[] = dates.map((date) => ({
       id: makeId(),
       title: goal.title,
+      label: goal.label ?? 'A',
       date: Timestamp.fromDate(date),
       isCompleted: false,
       kind: 'deletable',
@@ -781,6 +865,7 @@ export default function PlannerApp() {
     const goal: FirebaseWeeklyGoal = {
       id: makeId(),
       title: goalToCopy.title,
+      label: goalToCopy.label ?? 'A',
       time: null,
       reminder: 'none',
       order: visibleNextWeekGoals.length,
@@ -809,6 +894,7 @@ export default function PlannerApp() {
     const goal: FirebaseDailyGoal = {
       id: makeId(),
       title: text,
+      label: 'A',
       date: Timestamp.fromDate(date),
       isCompleted: false,
       kind: 'deletable',
@@ -956,15 +1042,28 @@ export default function PlannerApp() {
   function moveDailyGoal(goalId: string, date: Date, direction: number) {
     if (!currentPlan) return;
 
-    const goals = goalsForDate(date);
-    const currentIndex = goals.findIndex((goal) => goal.id === goalId);
+    const target = goalsForDate(date).find((goal) => goal.id === goalId);
+
+    if (!target) return;
+
+    const sameLabelGoals = goalsForDate(date).filter(
+      (goal) => goalLabel(goal) === goalLabel(target),
+    );
+
+    const currentIndex = sameLabelGoals.findIndex((goal) => goal.id === goalId);
     const newIndex = currentIndex + direction;
 
-    if (currentIndex < 0 || newIndex < 0 || newIndex >= goals.length) return;
+    if (currentIndex < 0 || newIndex < 0 || newIndex >= sameLabelGoals.length) {
+      return;
+    }
 
-    goals.splice(newIndex, 0, goals.splice(currentIndex, 1)[0]);
+    sameLabelGoals.splice(
+      newIndex,
+      0,
+      sameLabelGoals.splice(currentIndex, 1)[0],
+    );
 
-    const reorderedGoals = goals.map((goal, index) => ({
+    const reorderedGoals = sameLabelGoals.map((goal, index) => ({
       ...goal,
       order: index,
       updatedAt: now(),
@@ -979,6 +1078,32 @@ export default function PlannerApp() {
     };
 
     syncDailyGoalsChange(updatedPlan, reorderedGoals);
+  }
+
+  function updateDailyGoalLabel(goalId: string, label: string | null) {
+    if (!currentPlan) return;
+
+    const targetGoal = currentPlan.dailyGoals.find(
+      (goal) => goal.id === goalId,
+    );
+
+    if (!targetGoal) return;
+
+    const updatedGoal = {
+      ...targetGoal,
+      label: normalizeGoalLabel(label),
+      updatedAt: now(),
+    };
+
+    const updatedPlan = {
+      ...currentPlan,
+      updatedAt: now(),
+      dailyGoals: currentPlan.dailyGoals.map((goal) =>
+        goal.id === goalId ? updatedGoal : goal,
+      ),
+    };
+
+    syncDailyGoalChange(updatedPlan, updatedGoal);
   }
 
   function toggleDay(date: Date) {
@@ -1039,6 +1164,10 @@ export default function PlannerApp() {
                 <GoalRow
                   key={goal.id}
                   title={goal.title}
+                  label={goal.label}
+                  onLabelChange={(label) =>
+                    updateSomedayGoalLabel(goal.id, label)
+                  }
                   onMove={(direction) => moveSomedayGoal(goal.id, direction)}
                   onDelete={() => deleteSomedayGoal(goal.id)}
                 />
@@ -1084,6 +1213,7 @@ export default function PlannerApp() {
                   {shouldShowGoalDivider(weeklyGoals, index) && <GoalDivider />}
                   <GoalRow
                     title={goal.title}
+                    label={goal.label}
                     showCopy
                     weekDates={weekDates}
                     onCopyToDays={(dates) =>
@@ -1094,6 +1224,9 @@ export default function PlannerApp() {
                     }
                     onCopyToNextWeek={() => copyWeeklyGoalToNextWeek(goal)}
                     onMove={(direction) => moveWeeklyGoal(goal.id, direction)}
+                    onLabelChange={(label) =>
+                      updateWeeklyGoalLabel(goal.id, label)
+                    }
                     onDelete={() => deleteWeeklyGoal(goal.id)}
                   />
                 </div>
@@ -1171,6 +1304,9 @@ export default function PlannerApp() {
                             time,
                             reminder,
                           )
+                        }
+                        onUpdateLabel={(label) =>
+                          updateDailyGoalLabel(goal.id, label)
                         }
                         onLock={() => lockDailyGoal(goal.id)}
                         onDelete={() => deleteDailyGoal(goal.id)}
@@ -1897,12 +2033,20 @@ function progressStatsForGoals(goals: FirebaseDailyGoal[]): GoalProgressStats {
   };
 }
 
-function shouldShowGoalDivider<T>(_goals: T[], _index: number) {
-  return false;
+function shouldShowGoalDivider<T extends { label?: string | null }>(
+  goals: T[],
+  index: number,
+) {
+  if (index === 0) return false;
+
+  return goalLabel(goals[index - 1]) !== goalLabel(goals[index]);
 }
 
-function shouldShowDailyGoalDivider<T>(_goals: T[], _index: number) {
-  return false;
+function shouldShowDailyGoalDivider<T extends { label?: string | null }>(
+  goals: T[],
+  index: number,
+) {
+  return shouldShowGoalDivider(goals, index);
 }
 
 function GoalDivider() {
@@ -1915,23 +2059,54 @@ function goalTitleClassName(isCompleted = false, isDisabled = false) {
   return 'text-black';
 }
 
+function GoalLabelSelect({
+  label,
+  onChange,
+}: {
+  label?: string | null;
+  onChange?: (label: string | null) => void;
+}) {
+  const value = normalizeGoalLabel(label) ?? 'A';
+
+  return (
+    <div className='relative shrink-0'>
+      <select
+        value={value}
+        onChange={(event) => onChange?.(event.target.value)}
+        className='h-7 min-w-7 appearance-none rounded-full bg-blue-50 px-2 text-center text-[12px] font-bold text-blue-500 outline-none'
+        aria-label='Goal label'
+      >
+        {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => (
+          <option key={letter} value={letter}>
+            {letter}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function GoalRow({
   title,
+  label,
   showCopy = false,
   weekDates = [],
   onCopyToDays,
   onCopyToAllDays,
   onCopyToNextWeek,
   onMove,
+  onLabelChange,
   onDelete,
 }: {
   title: string;
+  label?: string | null;
   showCopy?: boolean;
   weekDates?: Date[];
   onCopyToDays?: (dates: Date[]) => void;
   onCopyToAllDays?: () => void;
   onCopyToNextWeek?: () => void;
   onMove: (direction: number) => void;
+  onLabelChange?: (label: string | null) => void;
   onDelete: () => void;
 }) {
   const [isCopyMenuOpen, setIsCopyMenuOpen] = useState(false);
@@ -2081,6 +2256,8 @@ function GoalRow({
 
   return (
     <div className='flex items-center gap-2 rounded-[14px] bg-white px-1 py-2.5'>
+      <GoalLabelSelect label={label} onChange={onLabelChange} />
+
       <p
         className={`min-w-0 flex-1 text-[16px] font-normal ${goalTitleClassName()}`}
       >
@@ -2118,6 +2295,7 @@ function DailyGoalRow({
   onToggle,
   onMove,
   onUpdateTimeReminder,
+  onUpdateLabel,
   onLock,
   onDelete,
 }: {
@@ -2127,6 +2305,7 @@ function DailyGoalRow({
   onToggle: () => void;
   onMove: (direction: number) => void;
   onUpdateTimeReminder: (time: string | null, reminder: GoalReminder) => void;
+  onUpdateLabel: (label: string | null) => void;
   onLock: () => void;
   onDelete: () => void;
 }) {
@@ -2135,6 +2314,8 @@ function DailyGoalRow({
   return (
     <>
       <div className='flex items-center gap-2 rounded-[14px] bg-white px-1 py-2.5'>
+        <GoalLabelSelect label={goal.label} onChange={onUpdateLabel} />
+
         <button
           type='button'
           onClick={onToggle}

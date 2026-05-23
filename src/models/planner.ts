@@ -28,6 +28,7 @@ export type FirebaseWeeklyPlan = {
 export type FirebaseWeeklyGoal = {
   id: string;
   title: string;
+  label?: string | null;
   kind?: GoalKind;
   time?: string | null;
   reminder?: GoalReminder;
@@ -40,6 +41,7 @@ export type FirebaseWeeklyGoal = {
 export type FirebaseDailyGoal = {
   id: string;
   title: string;
+  label?: string | null;
   date: Timestamp;
   isCompleted: boolean;
   kind?: GoalKind;
@@ -54,6 +56,7 @@ export type FirebaseDailyGoal = {
 export type FirebaseSomedayGoal = {
   id: string;
   title: string;
+  label?: string | null;
   order: number;
   createdAt: Timestamp;
   updatedAt?: Timestamp | null;
