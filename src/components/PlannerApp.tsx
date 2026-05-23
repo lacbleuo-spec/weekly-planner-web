@@ -2850,14 +2850,14 @@ function TimeReminderModal({
       >
         <div className='space-y-4'>
           <h2
-            className='text-[22px] font-bold'
+            className='text-center text-[22px] font-bold'
             style={{ color: 'var(--planner-text)' }}
           >
             Time & Reminder
           </h2>
 
           <p
-            className='mt-2 text-[15px]'
+            className='text-center mt-2 text-[15px]'
             style={{ color: 'var(--planner-muted)' }}
           >
             Set a time and reminder for this daily goal.
