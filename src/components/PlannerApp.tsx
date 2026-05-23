@@ -1036,16 +1036,13 @@ export default function PlannerApp() {
             </Card>
 
             <ExpandableCard
-              title='Someday Goals & Plans'
+              title='Someday Goals'
               subtitle={`${visibleSomedayGoals.length} goals`}
               expanded={isSomedayExpanded}
               onToggle={() => setIsSomedayExpanded((prev) => !prev)}
             >
               {visibleSomedayGoals.length === 0 && (
-                <EmptyText>
-                  Write down things you'd like to do someday, even if not right
-                  now
-                </EmptyText>
+                <EmptyText>Add someday goals</EmptyText>
               )}
 
               {visibleSomedayGoals.map((goal) => (
@@ -1083,13 +1080,13 @@ export default function PlannerApp() {
             />
 
             <ExpandableCard
-              title='Weekly Goals & Plans'
+              title='Weekly Goals'
               subtitle={`${weeklyGoals.length} goals`}
               expanded={isWeeklyExpanded}
               onToggle={() => setIsWeeklyExpanded((prev) => !prev)}
             >
               {weeklyGoals.length === 0 && (
-                <EmptyText>Add your goals for this week</EmptyText>
+                <EmptyText>Add goals for this week</EmptyText>
               )}
 
               {weeklyGoals.map((goal, index) => (
