@@ -302,6 +302,7 @@ export default function PlannerApp() {
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showAIAnalysisNotice, setShowAIAnalysisNotice] = useState(false);
+  const [showResetWeekModal, setShowResetWeekModal] = useState(false);
 
   useEffect(() => {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -1123,6 +1124,50 @@ export default function PlannerApp() {
     });
   }
 
+  async function resetCurrentWeek() {
+    if (!currentPlan) return;
+
+    const deletedAt = now();
+
+    const deletedWeeklyGoals = currentPlan.weeklyGoals.map((goal) => ({
+      ...goal,
+      deletedAt,
+      updatedAt: deletedAt,
+    }));
+
+    const deletedDailyGoals = currentPlan.dailyGoals.map((goal) => ({
+      ...goal,
+      deletedAt,
+      updatedAt: deletedAt,
+    }));
+
+    const updatedPlan: FirebaseWeeklyPlan = {
+      ...currentPlan,
+      updatedAt: deletedAt,
+      deletedAt,
+      weeklyGoals: deletedWeeklyGoals,
+      dailyGoals: deletedDailyGoals,
+    };
+
+    savePlanChange(updatedPlan);
+    setShowResetWeekModal(false);
+
+    if (!auth.user) return;
+
+    try {
+      await Promise.all([
+        saveWeeklyGoals(auth.user.uid, updatedPlan, deletedWeeklyGoals),
+        saveDailyGoals(auth.user.uid, updatedPlan, deletedDailyGoals),
+      ]);
+
+      setSyncError(null);
+    } catch (error) {
+      setSyncError(
+        error instanceof Error ? error.message : 'Failed to reset this week.',
+      );
+    }
+  }
+
   return (
     <main className='min-h-screen bg-[#f2f2f7] text-black'>
       <PlannerResponsiveLayout
@@ -1201,7 +1246,8 @@ export default function PlannerApp() {
               showDatePicker={showDatePicker}
               onToggleDatePicker={() => setShowDatePicker((prev) => !prev)}
               onPickDate={moveToWeekContaining}
-              onShowAIAnalysisNotice={() => setShowAIAnalysisNotice(true)}
+              onAIAnalysis={() => setShowAIAnalysisNotice(true)}
+              onResetWeek={() => setShowResetWeekModal(true)}
             />
 
             <ExpandableCard
@@ -1342,6 +1388,13 @@ export default function PlannerApp() {
         />
       )}
 
+      {showResetWeekModal && (
+        <ConfirmResetWeekModal
+          onCancel={() => setShowResetWeekModal(false)}
+          onConfirm={resetCurrentWeek}
+        />
+      )}
+
       {showAIAnalysisNotice && (
         <NoticeModal
           title='AI Analysis'
@@ -1384,7 +1437,8 @@ function WeekProgressCard({
   showDatePicker,
   onToggleDatePicker,
   onPickDate,
-  onShowAIAnalysisNotice,
+  onAIAnalysis,
+  onResetWeek,
 }: {
   selectedWeekStartDate: Date;
   selectedWeekEndDate: Date;
@@ -1396,7 +1450,8 @@ function WeekProgressCard({
   showDatePicker: boolean;
   onToggleDatePicker: () => void;
   onPickDate: (date: Date) => void;
-  onShowAIAnalysisNotice: () => void;
+  onAIAnalysis: () => void;
+  onResetWeek: () => void;
 }) {
   const [progressFilter, setProgressFilter] =
     useState<GoalProgressFilter>('overall');
@@ -1414,6 +1469,12 @@ function WeekProgressCard({
       : progressFilter === 'nonDeletable'
         ? 'Locked Goals'
         : 'Overall Progress';
+
+  const [isWeekMenuOpen, setIsWeekMenuOpen] = useState(false);
+
+  function closeWeekMenu() {
+    setIsWeekMenuOpen(false);
+  }
 
   return (
     <Card>
@@ -1440,13 +1501,29 @@ function WeekProgressCard({
           )}
         </div>
 
-        <button
-          onClick={onShowAIAnalysisNotice}
-          className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500'
-          aria-label='AI Analysis'
-        >
-          <MoreHorizontal size={20} strokeWidth={2.5} />
-        </button>
+        <div className='relative'>
+          <button
+            type='button'
+            onClick={() => setIsWeekMenuOpen((prev) => !prev)}
+            className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
+            aria-label='Week menu'
+          >
+            <MoreHorizontal size={20} strokeWidth={2.5} />
+          </button>
+
+          {isWeekMenuOpen && (
+            <WeekOptionsMenu
+              onAIAnalysis={() => {
+                closeWeekMenu();
+                onAIAnalysis();
+              }}
+              onResetWeek={() => {
+                closeWeekMenu();
+                onResetWeek();
+              }}
+            />
+          )}
+        </div>
       </div>
 
       <div className='mt-5 flex items-center justify-between gap-4'>
@@ -1819,6 +1896,88 @@ function NoticeModal({
         >
           OK
         </button>
+      </div>
+    </div>
+  );
+}
+
+function WeekOptionsMenu({
+  onAIAnalysis,
+  onResetWeek,
+}: {
+  onAIAnalysis: () => void;
+  onResetWeek: () => void;
+}) {
+  return (
+    <div className='absolute right-0 top-10 z-50 w-[210px] overflow-hidden rounded-[18px] border border-gray-100 bg-white p-1.5 shadow-[0_14px_40px_rgba(0,0,0,0.16)]'>
+      <button
+        type='button'
+        onClick={onAIAnalysis}
+        className='flex w-full items-center gap-3 rounded-[14px] px-3.5 py-3 text-left text-blue-500 active:bg-blue-50'
+      >
+        <span className='text-[15px] font-semibold'>AI Analysis</span>
+      </button>
+
+      <button
+        type='button'
+        onClick={onResetWeek}
+        className='flex w-full items-center gap-3 rounded-[14px] px-3.5 py-3 text-left text-red-500 active:bg-red-50'
+      >
+        <span className='text-[15px] font-semibold'>Reset This Week</span>
+      </button>
+    </div>
+  );
+}
+
+function ConfirmResetWeekModal({
+  onCancel,
+  onConfirm,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      onClick={onCancel}
+      className='fixed inset-0 z-[9999] flex items-end justify-center bg-black/30 p-4'
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        className='w-full max-w-md rounded-[24px] bg-white p-6'
+      >
+        <div className='space-y-5 text-center'>
+          <div>
+            <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500'>
+              <Trash size={22} />
+            </div>
+
+            <h2 className='mt-4 text-[22px] font-bold'>Reset this week?</h2>
+
+            <p className='mt-3 text-[15px] leading-6 text-gray-500'>
+              This will reset all weekly and daily goals for this week.
+              <br />
+              This cannot be undone.
+            </p>
+          </div>
+
+          <div className='grid grid-cols-2 gap-2'>
+            <button
+              type='button'
+              onClick={onCancel}
+              className='rounded-[16px] bg-[#f2f2f7] p-4 font-semibold text-gray-600 active:scale-[0.98]'
+            >
+              Cancel
+            </button>
+
+            <button
+              type='button'
+              onClick={onConfirm}
+              className='rounded-[16px] bg-red-500 p-4 font-semibold text-white active:scale-[0.98]'
+            >
+              Reset Week
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
