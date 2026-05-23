@@ -410,16 +410,6 @@ export default function PlannerApp() {
 
   useEffect(() => {
     function syncExpandedDaysForScreenSize() {
-      const isDesktop = window.matchMedia('(min-width: 1280px)').matches;
-
-      if (wasDesktopRef.current === isDesktop) return;
-      wasDesktopRef.current = isDesktop;
-
-      if (isDesktop) {
-        setExpandedDayKeys(new Set(weekDates.map(dayKey)));
-        return;
-      }
-
       if (weekDates.some((date) => isSameDay(date, new Date()))) {
         setExpandedDayKeys(new Set([dayKey(new Date())]));
       } else {
