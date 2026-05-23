@@ -18,12 +18,15 @@ import {
   Lock,
   LockOpen,
   LogOut,
+  Moon,
   MoreHorizontal,
   Plus,
   Smartphone,
+  Sun,
   Trash,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useTheme } from '@/hooks/useTheme';
 import {
   addingDays,
   dayKey,
@@ -275,6 +278,7 @@ function upsertPlan(
 
 export default function PlannerApp() {
   const auth = useAuth();
+  const { theme, isDark, toggleTheme } = useTheme();
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -1169,12 +1173,15 @@ export default function PlannerApp() {
   }
 
   return (
-    <main className='min-h-screen bg-[#f2f2f7] text-black'>
+    <main data-planner-theme={theme} className='min-h-screen transition-colors'>
       <PlannerResponsiveLayout
         weekDates={weekDates}
         globalSidebar={
           <>
-            <MobileAppCard />
+            <div className='flex items-center justify-between'>
+              <MobileAppCard />
+              <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+            </div>
 
             <Card>
               <div className='flex items-center justify-between gap-4'>
@@ -1381,6 +1388,197 @@ export default function PlannerApp() {
         }}
       />
 
+      <style jsx global>{`
+        :root,
+        [data-planner-theme='light'] {
+          --planner-bg: #f2f2f7;
+          --planner-card: #ffffff;
+          --planner-card-raised: #ffffff;
+          --planner-surface: #f2f2f7;
+          --planner-surface-hover: #e5e7eb;
+          --planner-text: #111827;
+          --planner-muted: #6b7280;
+          --planner-subtle: #9ca3af;
+          --planner-border: rgba(17, 24, 39, 0.08);
+          --planner-shadow: rgba(0, 0, 0, 0.16);
+          --planner-blue: #3b82f6;
+          --planner-blue-soft: #eff6ff;
+          --planner-blue-track: #dbeafe;
+          --planner-red: #ef4444;
+          --planner-red-soft: #fef2f2;
+          --planner-overlay: rgba(0, 0, 0, 0.3);
+        }
+
+        :root.dark,
+        [data-planner-theme='dark'] {
+          --planner-bg: #111113;
+          --planner-card: #1c1c1f;
+          --planner-card-raised: #242428;
+          --planner-surface: #2c2c31;
+          --planner-surface-hover: #35353b;
+          --planner-text: #f4f4f5;
+          --planner-muted: #a1a1aa;
+          --planner-subtle: #71717a;
+          --planner-border: rgba(255, 255, 255, 0.09);
+          --planner-shadow: rgba(0, 0, 0, 0.52);
+          --planner-blue: #60a5fa;
+          --planner-blue-soft: rgba(96, 165, 250, 0.16);
+          --planner-blue-track: rgba(96, 165, 250, 0.22);
+          --planner-red: #fb7185;
+          --planner-red-soft: rgba(251, 113, 133, 0.16);
+          --planner-overlay: rgba(0, 0, 0, 0.62);
+        }
+
+        html,
+        body {
+          background: var(--planner-bg);
+        }
+
+        [data-planner-theme] {
+          background: var(--planner-bg);
+          color: var(--planner-text);
+        }
+
+        [data-planner-theme] .bg-white,
+        [data-planner-theme] .bg-white\/95,
+        html.dark .bg-white,
+        html.dark .bg-white\/95 {
+          background-color: var(--planner-card) !important;
+        }
+
+        [data-planner-theme] .bg-\[\#f2f2f7\],
+        [data-planner-theme] input.bg-\[\#f2f2f7\],
+        html.dark .bg-\[\#f2f2f7\],
+        html.dark input.bg-\[\#f2f2f7\] {
+          background-color: var(--planner-surface) !important;
+        }
+
+        [data-planner-theme] .text-black,
+        html.dark .text-black {
+          color: var(--planner-text) !important;
+        }
+
+        [data-planner-theme] input,
+        [data-planner-theme] select,
+        html.dark input,
+        html.dark select {
+          color: var(--planner-text);
+        }
+
+        [data-planner-theme] input::placeholder,
+        html.dark input::placeholder {
+          color: var(--planner-muted);
+          opacity: 1;
+        }
+
+        [data-planner-theme] .text-gray-500,
+        [data-planner-theme] .text-gray-600,
+        html.dark .text-gray-500,
+        html.dark .text-gray-600 {
+          color: var(--planner-muted) !important;
+        }
+
+        [data-planner-theme] .text-gray-300,
+        [data-planner-theme] .text-gray-400,
+        html.dark .text-gray-300,
+        html.dark .text-gray-400 {
+          color: var(--planner-subtle) !important;
+        }
+
+        [data-planner-theme] .bg-gray-100,
+        [data-planner-theme] .active\:bg-gray-100:active,
+        html.dark .bg-gray-100,
+        html.dark .active\:bg-gray-100:active {
+          background-color: var(--planner-surface-hover) !important;
+        }
+
+        [data-planner-theme] .bg-gray-200,
+        html.dark .bg-gray-200 {
+          background-color: var(--planner-surface-hover) !important;
+        }
+
+        [data-planner-theme] .border-gray-100,
+        [data-planner-theme] .border-white\/70,
+        html.dark .border-gray-100,
+        html.dark .border-white\/70 {
+          border-color: var(--planner-border) !important;
+        }
+
+        [data-planner-theme] .bg-blue-50,
+        [data-planner-theme] .bg-blue-100,
+        [data-planner-theme] .active\:bg-blue-50:active,
+        html.dark .bg-blue-50,
+        html.dark .bg-blue-100,
+        html.dark .active\:bg-blue-50:active {
+          background-color: var(--planner-blue-soft) !important;
+        }
+
+        [data-planner-theme] .text-blue-500,
+        [data-planner-theme] .text-blue-300,
+        html.dark .text-blue-500,
+        html.dark .text-blue-300 {
+          color: var(--planner-blue) !important;
+        }
+
+        [data-planner-theme] .bg-blue-500,
+        html.dark .bg-blue-500 {
+          background-color: var(--planner-blue) !important;
+        }
+
+        [data-planner-theme] .bg-red-50,
+        [data-planner-theme] .active\:bg-red-50:active,
+        html.dark .bg-red-50,
+        html.dark .active\:bg-red-50:active {
+          background-color: var(--planner-red-soft) !important;
+        }
+
+        [data-planner-theme] .text-red-500,
+        html.dark .text-red-500 {
+          color: var(--planner-red) !important;
+        }
+
+        [data-planner-theme] .bg-red-500,
+        html.dark .bg-red-500 {
+          background-color: var(--planner-red) !important;
+        }
+
+        [data-planner-theme] .bg-black\/30,
+        html.dark .bg-black\/30 {
+          background-color: var(--planner-overlay) !important;
+        }
+
+        [data-planner-theme] section.rounded-\[24px\],
+        [data-planner-theme] div.rounded-\[24px\].bg-white,
+        [data-planner-theme] div.rounded-\[18px\].bg-white,
+        html.dark section.rounded-\[24px\],
+        html.dark div.rounded-\[24px\].bg-white,
+        html.dark div.rounded-\[18px\].bg-white {
+          border: 1px solid var(--planner-border);
+        }
+
+        [data-planner-theme] .shadow-\[0_14px_40px_rgba\(0\,0\,0\,0\.16\)\],
+        [data-planner-theme] .shadow-\[0_18px_50px_rgba\(0\,0\,0\,0\.18\)\],
+        html.dark .shadow-\[0_14px_40px_rgba\(0\,0\,0\,0\.16\)\],
+        html.dark .shadow-\[0_18px_50px_rgba\(0\,0\,0\,0\.18\)\] {
+          box-shadow: 0 18px 50px var(--planner-shadow) !important;
+        }
+
+        html.dark svg circle[stroke='rgb(219 234 254)'],
+        [data-planner-theme='dark'] svg circle[stroke='rgb(219 234 254)'] {
+          stroke: var(--planner-blue-track);
+        }
+
+        html.dark svg circle[stroke='rgb(59 130 246)'],
+        [data-planner-theme='dark'] svg circle[stroke='rgb(59 130 246)'] {
+          stroke: var(--planner-blue);
+        }
+
+        html.dark span.bg-gray-400,
+        [data-planner-theme='dark'] span.bg-gray-400 {
+          background-color: var(--planner-subtle) !important;
+        }
+      `}</style>
+
       {goalToLock && (
         <LockGoalModal
           onCancel={() => setGoalToLock(null)}
@@ -1422,8 +1620,32 @@ export default function PlannerApp() {
   );
 }
 
+function ThemeToggle({
+  isDark,
+  onToggle,
+}: {
+  isDark: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type='button'
+      onClick={onToggle}
+      className='flex h-9 w-9 items-center justify-center rounded-full bg-white text-gray-500 transition active:scale-[0.98] active:bg-gray-100'
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={isDark ? 'Light mode' : 'Dark mode'}
+    >
+      {isDark ? <Sun size={17} /> : <Moon size={17} />}
+    </button>
+  );
+}
+
 function Card({ children }: { children: React.ReactNode }) {
-  return <section className='rounded-[24px] bg-white p-5'>{children}</section>;
+  return (
+    <section className='rounded-[24px] bg-white p-5 transition-colors'>
+      {children}
+    </section>
+  );
 }
 
 function WeekProgressCard({
@@ -2627,9 +2849,17 @@ function TimeReminderModal({
         className='w-full max-w-md rounded-[24px] bg-white p-6'
       >
         <div className='space-y-4'>
-          <h2 className='text-center text-[22px] font-bold'>Time & Reminder</h2>
+          <h2
+            className='text-[22px] font-bold'
+            style={{ color: 'var(--planner-text)' }}
+          >
+            Time & Reminder
+          </h2>
 
-          <p className='text-center text-[14px] text-gray-500'>
+          <p
+            className='mt-2 text-[15px]'
+            style={{ color: 'var(--planner-muted)' }}
+          >
             Set a time and reminder for this daily goal.
           </p>
 
@@ -2867,7 +3097,12 @@ function AuthModal({
       >
         <div
           onClick={(event) => event.stopPropagation()}
-          className='w-full max-w-md rounded-[24px] bg-white p-6'
+          className='w-full max-w-md rounded-[24px] p-6'
+          style={{
+            backgroundColor: 'var(--planner-card)',
+            color: 'var(--planner-text)',
+            border: '1px solid var(--planner-border)',
+          }}
         >
           <div className='space-y-4 text-center'>
             <Cloud
