@@ -104,6 +104,22 @@ function makePlanMetaFromDate(date: Date): FirebaseWeeklyPlanMeta {
   };
 }
 
+function removeWeekKeyFromWeeklyGoal({
+  weekKey,
+  ...goal
+}: FirebaseWeeklyGoalDocument): FirebaseWeeklyGoal {
+  void weekKey;
+  return goal;
+}
+
+function removeWeekKeyFromDailyGoal({
+  weekKey,
+  ...goal
+}: FirebaseDailyGoalDocument): FirebaseDailyGoal {
+  void weekKey;
+  return goal;
+}
+
 function assemblePlans(
   metas: FirebaseWeeklyPlanMeta[],
   weeklyGoals: FirebaseWeeklyGoalDocument[],
@@ -132,11 +148,11 @@ function assemblePlans(
       ...meta,
       weeklyGoals: weeklyGoals
         .filter((goal) => goal.weekKey === key)
-        .map(({ weekKey: _weekKey, ...goal }) => goal)
+        .map(removeWeekKeyFromWeeklyGoal)
         .sort((a, b) => a.order - b.order),
       dailyGoals: dailyGoals
         .filter((goal) => goal.weekKey === key)
-        .map(({ weekKey: _weekKey, ...goal }) => goal)
+        .map(removeWeekKeyFromDailyGoal)
         .sort((a, b) => {
           const dateDiff = a.date.toMillis() - b.date.toMillis();
           return dateDiff !== 0 ? dateDiff : a.order - b.order;

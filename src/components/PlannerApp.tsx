@@ -55,8 +55,6 @@ import {
 
 const REORDER_THRESHOLD = 42;
 const LOCAL_STORAGE_KEY = 'weekly-planner-local-data-v1';
-const IOS_APP_STORE_URL =
-  'https://apps.apple.com/kr/app/weekly-goal-based-planner/id6764600765';
 
 type LegacyGoalKind = 'flexible' | 'strong';
 
@@ -314,14 +312,18 @@ export default function PlannerApp() {
           JSON.parse(raw) as StoredPlannerData,
         );
 
-        setWeeklyPlans(restoredData.weeklyPlans);
-        setSomedayGoals(restoredData.somedayGoals);
+        queueMicrotask(() => {
+          setWeeklyPlans(restoredData.weeklyPlans);
+          setSomedayGoals(restoredData.somedayGoals);
+        });
       } catch {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
       }
     }
 
-    setHasLoadedLocalData(true);
+    queueMicrotask(() => {
+      setHasLoadedLocalData(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -345,15 +347,19 @@ export default function PlannerApp() {
     if (auth.isLoading) return;
 
     if (!auth.user) {
-      setWeeklyPlans([]);
-      setSomedayGoals([]);
-      setLastSyncedAt(null);
-      setSyncError(null);
+      queueMicrotask(() => {
+        setWeeklyPlans([]);
+        setSomedayGoals([]);
+        setLastSyncedAt(null);
+        setSyncError(null);
+      });
       localStorage.removeItem(LOCAL_STORAGE_KEY);
       return;
     }
 
-    setSyncError(null);
+    queueMicrotask(() => {
+      setSyncError(null);
+    });
 
     const unsubscribe = subscribePlannerData(
       auth.user.uid,
@@ -368,7 +374,7 @@ export default function PlannerApp() {
     );
 
     return () => unsubscribe();
-  }, [auth.isLoading, auth.user?.uid]);
+  }, [auth.isLoading, auth.user]);
 
   const selectedWeekEndDate = useMemo(
     () => endOfWeek(selectedWeekStartDate),
@@ -2452,12 +2458,6 @@ function TimeReminderModal({
   const selectedTime =
     selectedHour && selectedMinute ? `${selectedHour}:${selectedMinute}` : null;
 
-  useEffect(() => {
-    if (!selectedTime) {
-      setReminder('none');
-    }
-  }, [selectedTime]);
-
   return (
     <div
       onClick={onClose}
@@ -2478,9 +2478,11 @@ function TimeReminderModal({
             <div className='relative'>
               <select
                 value={selectedHour ?? ''}
-                onChange={(event) =>
-                  setSelectedHour(event.target.value || null)
-                }
+                onChange={(event) => {
+                  const nextHour = event.target.value || null;
+                  setSelectedHour(nextHour);
+                  if (!nextHour || !selectedMinute) setReminder('none');
+                }}
                 className='w-full appearance-none rounded-[14px] bg-[#f2f2f7] py-4 pl-4 pr-10 text-[16px] font-semibold outline-none'
               >
                 <option value=''>Hour</option>
@@ -2505,9 +2507,11 @@ function TimeReminderModal({
             <div className='relative'>
               <select
                 value={selectedMinute ?? ''}
-                onChange={(event) =>
-                  setSelectedMinute(event.target.value || null)
-                }
+                onChange={(event) => {
+                  const nextMinute = event.target.value || null;
+                  setSelectedMinute(nextMinute);
+                  if (!selectedHour || !nextMinute) setReminder('none');
+                }}
                 className='w-full appearance-none rounded-[14px] bg-[#f2f2f7] py-4 pl-4 pr-10 text-[16px] font-semibold outline-none'
               >
                 <option value=''>Minute</option>
