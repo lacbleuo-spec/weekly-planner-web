@@ -1,5 +1,3 @@
-// PlannerResponsiveLayout
-
 'use client';
 
 import { dayKey } from '@/lib/date';
@@ -15,7 +13,7 @@ export function PlannerResponsiveLayout({
   weekDates: Date[];
   renderDay: (date: Date) => React.ReactNode;
 }) {
-  const columns = [
+  const desktopColumns = [
     [weekDates[0], weekDates[4]], // 월 금
     [weekDates[1], weekDates[5]], // 화 토
     [weekDates[2], weekDates[6]], // 수 일
@@ -31,8 +29,14 @@ export function PlannerResponsiveLayout({
             {weekSidebar}
           </div>
 
-          {columns.map((dates, columnIndex) => (
-            <div key={columnIndex} className='space-y-3.5'>
+          <div className='space-y-3.5 xl:hidden'>
+            {weekDates.map((date) => (
+              <div key={dayKey(date)}>{renderDay(date)}</div>
+            ))}
+          </div>
+
+          {desktopColumns.map((dates, columnIndex) => (
+            <div key={columnIndex} className='hidden space-y-3.5 xl:block'>
               {dates.map((date) => (
                 <div key={dayKey(date)}>{renderDay(date)}</div>
               ))}

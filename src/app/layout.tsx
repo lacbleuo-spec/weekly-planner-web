@@ -4,48 +4,50 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  verification: { google: 'JhI_X0rKnL0y87h2f0InId_MAudMVXJKfhp5wNFZt_o' },
+  verification: {
+    google: 'JhI_X0rKnL0y87h2f0InId_MAudMVXJKfhp5wNFZt_o',
+  },
 
   title: {
-    default: 'Weekly Goal-Based Planner',
-    template: '%s | Weekly Goal-Based Planner',
+    default: 'Weekboard',
+    template: '%s | Weekboard',
   },
 
   description:
     'A simple weekly planner for weekly goals, daily goals, someday goals, and cloud sync.',
 
   keywords: [
+    'weekboard',
     'weekly planner',
     'goal planner',
     'daily goals',
     'weekly goals',
     'productivity',
     'planner',
-    'goal based planner',
   ],
 
-  applicationName: 'Weekly Goal-Based Planner',
+  applicationName: 'Weekboard',
 
   authors: [
     {
-      name: 'Weekly Goal-Based Planner',
+      name: 'Weekboard',
     },
   ],
 
-  creator: 'Weekly Goal-Based Planner',
-  publisher: 'Weekly Goal-Based Planner',
+  creator: 'Weekboard',
+  publisher: 'Weekboard',
 
-  metadataBase: new URL('https://www.weeklygoalplanner.com'),
+  metadataBase: new URL('https://www.weekboard.net'),
 
   openGraph: {
-    title: 'Weekly Goal-Based Planner',
+    title: 'Weekboard',
 
     description:
       'Plan weekly goals, daily goals, and someday goals with cloud sync.',
 
-    url: 'https://www.weeklygoalplanner.com',
+    url: 'https://www.weekboard.net',
 
-    siteName: 'Weekly Goal-Based Planner',
+    siteName: 'Weekboard',
 
     type: 'website',
   },
@@ -53,7 +55,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary',
 
-    title: 'Weekly Goal-Based Planner',
+    title: 'Weekboard',
 
     description:
       'Plan weekly goals, daily goals, and someday goals with cloud sync.',
