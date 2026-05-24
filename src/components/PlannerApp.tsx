@@ -2,6 +2,7 @@
 
 'use client';
 
+import type { Locale } from '@/i18n/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PlannerResponsiveLayout } from '@/components/PlannerResponsiveLayout';
@@ -35,11 +36,8 @@ import {
   addingDays,
   dayKey,
   endOfWeek,
-  englishWeekdayText,
   isSameDay,
-  monthDayText,
   startOfWeek,
-  weekdayShort,
 } from '@/lib/date';
 import {
   deleteCloudUserData,
@@ -60,9 +58,41 @@ import {
   GoalReminder,
 } from '@/models/planner';
 import { AiPlannerChat } from '@/components/AiPlannerChat';
+import { LanguageSelect } from '@/components/LanguageSelect';
+import { dictionaries } from '@/i18n/dictionaries';
 
 const REORDER_THRESHOLD = 42;
 const LOCAL_STORAGE_KEY = 'weekly-planner-local-data-v1';
+let dict = dictionaries.en;
+
+function formatText(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
+function localizedWeekdayText(date: Date) {
+  return dict.calendar.weekdayNames[date.getDay()];
+}
+
+function localizedWeekdayShortText(date: Date) {
+  return dict.calendar.weekdayShortNames[date.getDay()];
+}
+
+function localizedMonthDayText(date: Date) {
+  return formatText(dict.calendar.monthDay, {
+    month: dict.calendar.monthNames[date.getMonth()],
+    day: date.getDate(),
+  });
+}
+
+function localizedWeekRangeText(startDate: Date, endDate: Date) {
+  return formatText(dict.calendar.weekRange, {
+    start: localizedMonthDayText(startDate),
+    end: localizedMonthDayText(endDate),
+  });
+}
 
 type LegacyGoalKind = 'flexible' | 'strong';
 
@@ -281,7 +311,9 @@ function upsertPlan(
   return plans.map((plan) => (plan.id === updatedPlan.id ? updatedPlan : plan));
 }
 
-export default function PlannerApp() {
+export default function PlannerApp({ locale }: { locale: Locale }) {
+  dict = dictionaries[locale];
+
   const auth = useAuth();
   const { theme, isDark, toggleTheme } = useTheme();
 
@@ -515,7 +547,7 @@ export default function PlannerApp() {
       setSyncError(null);
     } catch (error) {
       setSyncError(
-        error instanceof Error ? error.message : 'Failed to sync weekly goal.',
+        error instanceof Error ? error.message : dict.errors.syncWeeklyGoal,
       );
     }
   }
@@ -533,7 +565,7 @@ export default function PlannerApp() {
       setSyncError(null);
     } catch (error) {
       setSyncError(
-        error instanceof Error ? error.message : 'Failed to sync weekly goals.',
+        error instanceof Error ? error.message : dict.errors.syncWeeklyGoals,
       );
     }
   }
@@ -551,7 +583,7 @@ export default function PlannerApp() {
       setSyncError(null);
     } catch (error) {
       setSyncError(
-        error instanceof Error ? error.message : 'Failed to sync daily goal.',
+        error instanceof Error ? error.message : dict.errors.syncDailyGoal,
       );
     }
   }
@@ -569,7 +601,7 @@ export default function PlannerApp() {
       setSyncError(null);
     } catch (error) {
       setSyncError(
-        error instanceof Error ? error.message : 'Failed to sync daily goals.',
+        error instanceof Error ? error.message : dict.errors.syncDailyGoals,
       );
     }
   }
@@ -587,7 +619,7 @@ export default function PlannerApp() {
       setSyncError(null);
     } catch (error) {
       setSyncError(
-        error instanceof Error ? error.message : 'Failed to sync someday goal.',
+        error instanceof Error ? error.message : dict.errors.syncSomedayGoal,
       );
     }
   }
@@ -605,9 +637,7 @@ export default function PlannerApp() {
       setSyncError(null);
     } catch (error) {
       setSyncError(
-        error instanceof Error
-          ? error.message
-          : 'Failed to sync someday goals.',
+        error instanceof Error ? error.message : dict.errors.syncSomedayGoals,
       );
     }
   }
@@ -1172,7 +1202,7 @@ export default function PlannerApp() {
       setSyncError(null);
     } catch (error) {
       setSyncError(
-        error instanceof Error ? error.message : 'Failed to reset this week.',
+        error instanceof Error ? error.message : dict.errors.resetWeek,
       );
     }
   }
@@ -1185,18 +1215,24 @@ export default function PlannerApp() {
           <>
             <div className='flex items-center justify-between'>
               <MobileAppCard />
-              <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+
+              <div className='flex items-center gap-2'>
+                <LanguageSelect locale={locale} />
+                <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+              </div>
             </div>
 
             <Card>
               <div className='flex items-center justify-between gap-4'>
                 <div className='min-w-0'>
                   <h2 className='text-[17px] font-semibold'>
-                    {auth.isLoggedIn ? 'Cloud connected' : 'Not synced'}
+                    {auth.isLoggedIn
+                      ? dict.auth.cloudConnected
+                      : dict.auth.notSynced}
                   </h2>
 
                   <p className='mt-0.5 truncate text-[12px] text-gray-500'>
-                    {auth.user?.email ?? 'Log in to sync across devices'}
+                    {auth.user?.email ?? dict.auth.loginToSync}
                   </p>
                 </div>
 
@@ -1208,19 +1244,19 @@ export default function PlannerApp() {
                     size={18}
                     fill={auth.isLoggedIn ? 'currentColor' : 'none'}
                   />
-                  {auth.isLoggedIn ? 'Sync' : 'Login'}
+                  {auth.isLoggedIn ? dict.auth.sync : dict.auth.login}
                 </button>
               </div>
             </Card>
 
             <ExpandableCard
-              title='Someday Goals'
-              subtitle={`${visibleSomedayGoals.length} goals`}
+              title={dict.planner.somedayGoals}
+              subtitle={`${visibleSomedayGoals.length} ${dict.planner.goals}`}
               expanded={isSomedayExpanded}
               onToggle={() => setIsSomedayExpanded((prev) => !prev)}
             >
               {visibleSomedayGoals.length === 0 && (
-                <EmptyText>Add someday goals</EmptyText>
+                <EmptyText>{dict.planner.addSomedayGoals}</EmptyText>
               )}
 
               {visibleSomedayGoals.map((goal) => (
@@ -1239,7 +1275,7 @@ export default function PlannerApp() {
               <AddInput
                 value={newSomedayGoalText}
                 onChange={setNewSomedayGoalText}
-                placeholder='+ Add someday goal'
+                placeholder={dict.planner.addSomedayGoalInput}
                 onSubmit={addSomedayGoal}
               />
             </ExpandableCard>
@@ -1263,13 +1299,13 @@ export default function PlannerApp() {
             />
 
             <ExpandableCard
-              title='Weekly Goals'
-              subtitle={`${weeklyGoals.length} goals`}
+              title={dict.planner.weeklyGoals}
+              subtitle={`${weeklyGoals.length} ${dict.planner.goals}`}
               expanded={isWeeklyExpanded}
               onToggle={() => setIsWeeklyExpanded((prev) => !prev)}
             >
               {weeklyGoals.length === 0 && (
-                <EmptyText>Add goals for this week</EmptyText>
+                <EmptyText>{dict.planner.addGoalsForThisWeek}</EmptyText>
               )}
 
               {weeklyGoals.map((goal, index) => (
@@ -1299,7 +1335,7 @@ export default function PlannerApp() {
               <AddInput
                 value={newWeeklyGoalText}
                 onChange={setNewWeeklyGoalText}
-                placeholder='+ Add weekly goal'
+                placeholder={dict.planner.addWeeklyGoalInput}
                 onSubmit={addWeeklyGoal}
               />
             </ExpandableCard>
@@ -1316,10 +1352,10 @@ export default function PlannerApp() {
               <div className='flex w-full items-center justify-between'>
                 <div className='text-left'>
                   <h2 className='text-[17px] font-semibold'>
-                    {englishWeekdayText(date)}
+                    {localizedWeekdayText(date)}
                   </h2>
                   <p className='mt-1 text-[12px] text-gray-500'>
-                    {monthDayText(date)}
+                    {localizedMonthDayText(date)}
                   </p>
                 </div>
 
@@ -1332,7 +1368,11 @@ export default function PlannerApp() {
                     type='button'
                     onClick={() => toggleDay(date)}
                     className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
-                    aria-label={isExpanded ? 'Collapse day' : 'Expand day'}
+                    aria-label={
+                      isExpanded
+                        ? dict.accessibility.collapseDay
+                        : dict.accessibility.expandDay
+                    }
                   >
                     {isExpanded ? (
                       <ChevronUp size={18} />
@@ -1346,7 +1386,7 @@ export default function PlannerApp() {
               {isExpanded && (
                 <div className='mt-4 space-y-1.5'>
                   {goals.length === 0 && (
-                    <EmptyText>Add goals for this day</EmptyText>
+                    <EmptyText>{dict.planner.addGoalsForThisDay}</EmptyText>
                   )}
 
                   {goals.map((goal, index) => (
@@ -1383,7 +1423,9 @@ export default function PlannerApp() {
                     onChange={(value) =>
                       setNewGoalTexts((prev) => ({ ...prev, [key]: value }))
                     }
-                    placeholder={`+ Add ${englishWeekdayText(date)} goal`}
+                    placeholder={formatText(dict.planner.addDayGoalInput, {
+                      day: localizedWeekdayText(date),
+                    })}
                     onSubmit={() => addDailyGoal(date)}
                   />
                 </div>
@@ -1396,6 +1438,7 @@ export default function PlannerApp() {
       <AiPlannerChat
         isLoggedIn={auth.isLoggedIn}
         onRequireLogin={() => setShowAuthModal(true)}
+        locale={locale}
       />
 
       <style jsx global>{`
@@ -1605,8 +1648,8 @@ export default function PlannerApp() {
 
       {showAIAnalysisNotice && (
         <NoticeModal
-          title='AI Analysis'
-          message='Your AI weekly analysis report is coming soon.'
+          title={dict.planner.aiAnalysis}
+          message={dict.planner.aiAnalysisComingSoon}
           onClose={() => setShowAIAnalysisNotice(false)}
         />
       )}
@@ -1642,8 +1685,12 @@ function ThemeToggle({
       type='button'
       onClick={onToggle}
       className='flex h-9 w-9 items-center justify-center rounded-full bg-white text-gray-500 transition active:scale-[0.98] active:bg-gray-100'
-      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      title={isDark ? 'Light mode' : 'Dark mode'}
+      aria-label={
+        isDark
+          ? dict.accessibility.switchToLightMode
+          : dict.accessibility.switchToDarkMode
+      }
+      title={isDark ? dict.theme.lightMode : dict.theme.darkMode}
     >
       {isDark ? <Sun size={17} /> : <Moon size={17} />}
     </button>
@@ -1697,10 +1744,10 @@ function WeekProgressCard({
 
   const progressTitle =
     progressFilter === 'deletable'
-      ? 'Flexible Goals'
+      ? dict.planner.flexibleGoals
       : progressFilter === 'nonDeletable'
-        ? 'Locked Goals'
-        : 'Overall Progress';
+        ? dict.planner.lockedGoals
+        : dict.planner.overallProgress;
 
   const [isWeekMenuOpen, setIsWeekMenuOpen] = useState(false);
 
@@ -1717,8 +1764,10 @@ function WeekProgressCard({
             className='flex items-center gap-1.5 text-[17px] font-semibold text-black'
           >
             <span>
-              {monthDayText(selectedWeekStartDate)} -{' '}
-              {monthDayText(selectedWeekEndDate)}
+              {localizedWeekRangeText(
+                selectedWeekStartDate,
+                selectedWeekEndDate,
+              )}
             </span>
 
             <ChevronDown size={15} strokeWidth={3} className='text-gray-500' />
@@ -1738,7 +1787,7 @@ function WeekProgressCard({
             type='button'
             onClick={() => setIsWeekMenuOpen((prev) => !prev)}
             className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
-            aria-label='Week menu'
+            aria-label={dict.accessibility.weekMenu}
           >
             <MoreHorizontal size={20} strokeWidth={2.5} />
           </button>
@@ -1769,11 +1818,11 @@ function WeekProgressCard({
                 setProgressFilter(event.target.value as GoalProgressFilter)
               }
               className='absolute inset-0 h-full w-full cursor-pointer opacity-0'
-              aria-label='Progress type'
+              aria-label={dict.accessibility.progressType}
             >
-              <option value='overall'>Overall Progress</option>
-              <option value='deletable'>Flexible Goals</option>
-              <option value='nonDeletable'>Locked Goals</option>
+              <option value='overall'>{dict.planner.overallProgress}</option>
+              <option value='deletable'>{dict.planner.flexibleGoals}</option>
+              <option value='nonDeletable'>{dict.planner.lockedGoals}</option>
             </select>
 
             <ChevronDown
@@ -1785,7 +1834,7 @@ function WeekProgressCard({
 
           <p className='mt-1 text-[12px] text-gray-500'>
             {selectedProgressStats.completedCount} /{' '}
-            {selectedProgressStats.totalCount} completed
+            {selectedProgressStats.totalCount} {dict.planner.completed}
           </p>
         </div>
 
@@ -1847,7 +1896,7 @@ function CalendarPopover({
     <>
       <button
         type='button'
-        aria-label='Close calendar'
+        aria-label={dict.calendar.closeCalendar}
         onClick={onClose}
         className='fixed inset-0 z-40 cursor-default'
       />
@@ -1858,15 +1907,15 @@ function CalendarPopover({
             type='button'
             onClick={() => moveMonth(-1)}
             className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
-            aria-label='Previous month'
+            aria-label={dict.calendar.previousMonth}
           >
             <ChevronUp size={18} className='-rotate-90' />
           </button>
 
           <p className='text-[17px] font-semibold text-black'>
-            {visibleMonth.toLocaleDateString('en-US', {
-              month: 'long',
-              year: 'numeric',
+            {formatText(dict.calendar.monthYear, {
+              month: dict.calendar.monthNames[visibleMonth.getMonth()],
+              year: visibleMonth.getFullYear(),
             })}
           </p>
 
@@ -1874,14 +1923,14 @@ function CalendarPopover({
             type='button'
             onClick={() => moveMonth(1)}
             className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
-            aria-label='Next month'
+            aria-label={dict.calendar.nextMonth}
           >
             <ChevronUp size={18} className='rotate-90' />
           </button>
         </div>
 
         <div className='grid grid-cols-7 pb-1 text-center'>
-          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
+          {dict.calendar.weekdayHeaders.map((day, index) => (
             <p
               key={`${day}-${index}`}
               className='py-1 text-[12px] font-semibold text-gray-400'
@@ -1924,7 +1973,7 @@ function CalendarPopover({
             onClick={() => onPickDate(new Date())}
             className='rounded-full bg-blue-50 px-4 py-2 text-[15px] font-semibold text-blue-500 active:scale-[0.98]'
           >
-            Today
+            {dict.common.today}
           </button>
         </div>
       </div>
@@ -2036,7 +2085,9 @@ function WeeklyProgressBars({
               )}
             </div>
 
-            <p className='text-[12px] text-gray-500'>{weekdayShort(date)}</p>
+            <p className='text-[12px] text-gray-500'>
+              {localizedWeekdayShortText(date)}
+            </p>
           </div>
         );
       })}
@@ -2066,14 +2117,16 @@ function LockGoalModal({
               <Lock size={22} />
             </div>
 
-            <h2 className='mt-4 text-[22px] font-bold'>Lock this goal?</h2>
+            <h2 className='mt-4 text-[22px] font-bold'>
+              {dict.planner.lockThisGoal}
+            </h2>
 
             <p className='mt-3 text-[15px] leading-6 text-gray-500'>
-              Locked goals cannot be deleted.
+              {dict.planner.lockedGoalsCannotBeDeleted}
               <br />
-              Use this after you&apos;ve finished planning.
+              {dict.planner.lockGoalAfterPlanning}
               <br />
-              Locked goals can help you stay committed and follow through.
+              {dict.planner.lockGoalCommitment}
             </p>
           </div>
 
@@ -2083,7 +2136,7 @@ function LockGoalModal({
               onClick={onCancel}
               className='rounded-[16px] bg-[#f2f2f7] p-4 font-semibold text-gray-600 active:scale-[0.98]'
             >
-              Cancel
+              {dict.common.cancel}
             </button>
 
             <button
@@ -2091,7 +2144,7 @@ function LockGoalModal({
               onClick={onConfirm}
               className='rounded-[16px] bg-blue-500 p-4 font-semibold text-white active:scale-[0.98]'
             >
-              Lock Goal
+              {dict.planner.lockGoal}
             </button>
           </div>
         </div>
@@ -2126,7 +2179,7 @@ function NoticeModal({
           onClick={onClose}
           className='mt-5 rounded-[16px] bg-blue-500 px-6 py-3 font-semibold text-white'
         >
-          OK
+          {dict.common.ok}
         </button>
       </div>
     </div>
@@ -2147,7 +2200,9 @@ function WeekOptionsMenu({
         onClick={onAIAnalysis}
         className='flex w-full items-center gap-3 rounded-[14px] px-3.5 py-3 text-left text-blue-500 active:bg-blue-50'
       >
-        <span className='text-[15px] font-semibold'>AI Analysis</span>
+        <span className='text-[15px] font-semibold'>
+          {dict.planner.aiAnalysis}
+        </span>
       </button>
 
       <button
@@ -2155,7 +2210,9 @@ function WeekOptionsMenu({
         onClick={onResetWeek}
         className='flex w-full items-center gap-3 rounded-[14px] px-3.5 py-3 text-left text-red-500 active:bg-red-50'
       >
-        <span className='text-[15px] font-semibold'>Reset This Week</span>
+        <span className='text-[15px] font-semibold'>
+          {dict.planner.resetThisWeek}
+        </span>
       </button>
     </div>
   );
@@ -2183,12 +2240,14 @@ function ConfirmResetWeekModal({
               <Trash size={22} />
             </div>
 
-            <h2 className='mt-4 text-[22px] font-bold'>Reset this week?</h2>
+            <h2 className='mt-4 text-[22px] font-bold'>
+              {dict.planner.resetThisWeekQuestion}
+            </h2>
 
             <p className='mt-3 text-[15px] leading-6 text-gray-500'>
-              This will reset all weekly and daily goals for this week.
+              {dict.planner.resetThisWeekDescription}
               <br />
-              This cannot be undone.
+              {dict.planner.cannotBeUndone}
             </p>
           </div>
 
@@ -2198,7 +2257,7 @@ function ConfirmResetWeekModal({
               onClick={onCancel}
               className='rounded-[16px] bg-[#f2f2f7] p-4 font-semibold text-gray-600 active:scale-[0.98]'
             >
-              Cancel
+              {dict.common.cancel}
             </button>
 
             <button
@@ -2206,7 +2265,7 @@ function ConfirmResetWeekModal({
               onClick={onConfirm}
               className='rounded-[16px] bg-red-500 p-4 font-semibold text-white active:scale-[0.98]'
             >
-              Reset Week
+              {dict.planner.resetWeek}
             </button>
           </div>
         </div>
@@ -2280,13 +2339,13 @@ function MobileAppCard() {
         }`}
       >
         <Smartphone size={19} strokeWidth={2.2} className='w-5' />
-        Install App
+        {dict.mobile.installApp}
       </button>
 
       {showInstallNotice && (
         <NoticeModal
-          title='Add to Home Screen'
-          message='Open this page in Safari, tap the Share button, then choose Add to Home Screen.'
+          title={dict.mobile.addToHomeScreen}
+          message={dict.mobile.iosInstallDescription}
           onClose={() => setShowInstallNotice(false)}
         />
       )}
@@ -2319,7 +2378,11 @@ function ExpandableCard({
           type='button'
           onClick={onToggle}
           className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
-          aria-label={expanded ? 'Collapse section' : 'Expand section'}
+          aria-label={
+            expanded
+              ? dict.accessibility.collapseSection
+              : dict.accessibility.expandSection
+          }
         >
           {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
         </button>
@@ -2408,7 +2471,7 @@ function DragHandle({ onMove }: { onMove: (direction: number) => void }) {
       className={`flex h-8 w-8 touch-none cursor-grab items-center justify-center rounded-full transition-transform ${
         isDragging ? 'scale-110' : ''
       }`}
-      aria-label='Drag to reorder'
+      aria-label={dict.accessibility.dragToReorder}
     >
       <span className='flex flex-col items-center justify-center gap-[3px]'>
         <span className='h-[1.5px] w-[17px] rounded-full bg-gray-400' />
@@ -2471,7 +2534,7 @@ function GoalLabelSelect({
         value={value}
         onChange={(event) => onChange?.(event.target.value ?? null)}
         className='h-7 min-w-7 appearance-none rounded-full bg-blue-50 px-2 text-center text-[12px] font-bold text-blue-500 outline-none'
-        aria-label='Goal label'
+        aria-label={dict.accessibility.goalLabel}
       >
         {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => (
           <option key={letter} value={letter}>
@@ -2554,7 +2617,7 @@ function GoalRow({
           <div className='fixed inset-0 z-[9999] flex items-end justify-center bg-black/30 p-4'>
             <button
               type='button'
-              aria-label='Close copy menu'
+              aria-label={dict.accessibility.closeCopyMenu}
               onClick={closeCopyMenu}
               className='absolute inset-0 z-0 cursor-default'
             />
@@ -2562,9 +2625,11 @@ function GoalRow({
             <div className='relative z-10 w-full max-w-md animate-in slide-in-from-bottom-3 duration-200 rounded-[24px] bg-white p-6'>
               <div className='space-y-4'>
                 <div className='text-center'>
-                  <h2 className='text-[22px] font-bold'>Copy Weekly Goal</h2>
+                  <h2 className='text-[22px] font-bold'>
+                    {dict.planner.copyWeeklyGoal}
+                  </h2>
                   <p className='mt-2 text-[14px] text-gray-500'>
-                    Choose where to copy this weekly goal.
+                    {dict.planner.copyWeeklyGoalDescription}
                   </p>
                 </div>
 
@@ -2585,14 +2650,14 @@ function GoalRow({
                           }`}
                         >
                           <p className='text-[15px] font-semibold'>
-                            {englishWeekdayText(date)}
+                            {localizedWeekdayText(date)}
                           </p>
                           <p
                             className={`mt-0.5 text-[12px] ${
                               selected ? 'text-blue-100' : 'text-gray-500'
                             }`}
                           >
-                            {monthDayText(date)}
+                            {localizedMonthDayText(date)}
                           </p>
                         </button>
                       );
@@ -2609,7 +2674,7 @@ function GoalRow({
                     className='rounded-[16px] bg-blue-50 p-4 text-left text-blue-500 active:scale-[0.99]'
                   >
                     <span className='block font-semibold'>
-                      Copy to all days
+                      {dict.planner.copyToAllDays}
                     </span>
                   </button>
 
@@ -2624,8 +2689,9 @@ function GoalRow({
                     }`}
                   >
                     <span className='block font-semibold'>
-                      Copy to {selectedCopyDayKeys.size} day
-                      {selectedCopyDayKeys.size === 1 ? '' : 's'}
+                      {formatText(dict.planner.copyToSelectedDays, {
+                        count: selectedCopyDayKeys.size,
+                      })}
                     </span>
                   </button>
                 </div>
@@ -2638,10 +2704,10 @@ function GoalRow({
                   className='flex w-full items-center justify-between rounded-[16px] bg-blue-50 p-4 text-left active:scale-[0.99]'
                 >
                   <span className='font-semibold text-blue-500'>
-                    Copy to next week
+                    {dict.planner.copyToNextWeek}
                   </span>
                   <span className='text-[13px] font-semibold text-blue-300'>
-                    Weekly Goal
+                    {dict.planner.weeklyGoal}
                   </span>
                 </button>
               </div>
@@ -2667,7 +2733,7 @@ function GoalRow({
             type='button'
             onClick={() => setIsCopyMenuOpen(true)}
             className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
-            aria-label='Copy goal'
+            aria-label={dict.accessibility.copyGoal}
           >
             <Copy size={17} />
           </button>
@@ -2721,7 +2787,9 @@ function DailyGoalRow({
             !canToggle ? 'cursor-not-allowed opacity-40' : ''
           }`}
           aria-label={
-            canToggle ? 'Toggle goal' : 'Past goals cannot be checked'
+            canToggle
+              ? dict.accessibility.toggleGoal
+              : dict.accessibility.pastGoalsCannotBeChecked
           }
         >
           {goal.isCompleted ? (
@@ -2755,7 +2823,9 @@ function DailyGoalRow({
               : 'text-gray-400'
           }`}
           aria-label={
-            goalKind(goal) === 'nonDeletable' ? 'Goal is locked' : 'Lock goal'
+            goalKind(goal) === 'nonDeletable'
+              ? dict.accessibility.goalIsLocked
+              : dict.accessibility.lockGoal
           }
         >
           {goalKind(goal) === 'nonDeletable' ? (
@@ -2771,7 +2841,11 @@ function DailyGoalRow({
           className={`flex h-8 w-8 items-center justify-center rounded-full active:bg-gray-100 ${
             goal.time ? 'text-blue-500' : 'text-gray-400'
           }`}
-          aria-label={goal.time ? 'Time is set' : 'Set time and reminder'}
+          aria-label={
+            goal.time
+              ? dict.accessibility.timeIsSet
+              : dict.accessibility.setTimeAndReminder
+          }
         >
           <Clock size={17} />
         </button>
@@ -2783,7 +2857,7 @@ function DailyGoalRow({
             type='button'
             disabled
             className='flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full opacity-30'
-            aria-label='Timed goals are sorted by time'
+            aria-label={dict.accessibility.timedGoalsSortedByTime}
           >
             <span className='flex flex-col items-center justify-center gap-[3px]'>
               <span className='h-[1.5px] w-[17px] rounded-full bg-gray-400' />
@@ -2798,7 +2872,7 @@ function DailyGoalRow({
             type='button'
             disabled
             className='cursor-not-allowed p-1 text-gray-300'
-            aria-label='Non-deletable goals cannot be deleted'
+            aria-label={dict.accessibility.nonDeletableGoalsCannotBeDeleted}
           >
             <Trash size={18} />
           </button>
@@ -2863,14 +2937,14 @@ function TimeReminderModal({
             className='text-center text-[22px] font-bold'
             style={{ color: 'var(--planner-text)' }}
           >
-            Time & Reminder
+            {dict.planner.timeAndReminder}
           </h2>
 
           <p
             className='text-center mt-2 text-[15px]'
             style={{ color: 'var(--planner-muted)' }}
           >
-            Set a time and reminder for this daily goal.
+            {dict.planner.timeAndReminderDescription}
           </p>
 
           <div className='grid grid-cols-2 gap-2'>
@@ -2884,7 +2958,7 @@ function TimeReminderModal({
                 }}
                 className='w-full appearance-none rounded-[14px] bg-[#f2f2f7] py-4 pl-4 pr-10 text-[16px] font-semibold outline-none'
               >
-                <option value=''>Hour</option>
+                <option value=''>{dict.planner.hour}</option>
                 {Array.from({ length: 24 }, (_, hour) => {
                   const value = `${hour}`.padStart(2, '0');
 
@@ -2913,7 +2987,7 @@ function TimeReminderModal({
                 }}
                 className='w-full appearance-none rounded-[14px] bg-[#f2f2f7] py-4 pl-4 pr-10 text-[16px] font-semibold outline-none'
               >
-                <option value=''>Minute</option>
+                <option value=''>{dict.planner.minute}</option>
                 {Array.from({ length: 60 }, (_, minute) => {
                   const value = `${minute}`.padStart(2, '0');
 
@@ -2944,14 +3018,14 @@ function TimeReminderModal({
                 !selectedTime ? 'cursor-not-allowed text-gray-300' : ''
               }`}
             >
-              <option value='none'>No reminder</option>
-              <option value='atTime'>At event time</option>
-              <option value='5m'>5 minutes before</option>
-              <option value='10m'>10 minutes before</option>
-              <option value='15m'>15 minutes before</option>
-              <option value='30m'>30 minutes before</option>
-              <option value='1h'>1 hour before</option>
-              <option value='1d'>1 day before</option>
+              <option value='none'>{dict.planner.noReminder}</option>
+              <option value='atTime'>{dict.planner.atEventTime}</option>
+              <option value='5m'>5 {dict.planner.minutesBefore}</option>
+              <option value='10m'>10 {dict.planner.minutesBefore}</option>
+              <option value='15m'>15 {dict.planner.minutesBefore}</option>
+              <option value='30m'>30 {dict.planner.minutesBefore}</option>
+              <option value='1h'>1 {dict.planner.hourBefore}</option>
+              <option value='1d'>1 {dict.planner.dayBefore}</option>
             </select>
 
             <ChevronDown
@@ -2964,7 +3038,9 @@ function TimeReminderModal({
           </div>
 
           <p className='text-center text-[13px] text-gray-400'>
-            {selectedTime ? `${selectedTime} selected` : 'No time selected'}
+            {selectedTime
+              ? formatText(dict.planner.timeSelected, { time: selectedTime })
+              : dict.planner.noTimeSelected}
           </p>
 
           <button
@@ -2973,7 +3049,7 @@ function TimeReminderModal({
             }
             className='w-full rounded-[16px] bg-blue-500 p-4 font-semibold text-white'
           >
-            Save
+            {dict.common.save}
           </button>
 
           <button
@@ -2985,7 +3061,7 @@ function TimeReminderModal({
             }}
             className='w-full text-[14px] font-medium text-gray-500'
           >
-            Clear time
+            {dict.common.clearTime}
           </button>
         </div>
       </div>
@@ -3020,7 +3096,7 @@ function AuthModal({
     try {
       if (isCreatingAccount) {
         if (password !== confirmPassword) {
-          auth.setErrorMessage('Passwords do not match.');
+          auth.setErrorMessage(dict.auth.passwordsDoNotMatch);
           return;
         }
 
@@ -3041,13 +3117,13 @@ function AuthModal({
     setSuccessMessage(null);
 
     if (!trimmedEmail) {
-      auth.setErrorMessage('Please enter your email first.');
+      auth.setErrorMessage(dict.auth.pleaseEnterEmailFirst);
       return;
     }
 
     try {
       await auth.resetPassword(trimmedEmail);
-      setSuccessMessage('Password reset email sent. Please check your inbox.');
+      setSuccessMessage(dict.auth.passwordResetSent);
     } catch {
       // useAuth handles errorMessage.
     }
@@ -3060,25 +3136,21 @@ function AuthModal({
   }
 
   async function confirmDeleteAccount() {
-    const confirmed = window.confirm(
-      'This permanently deletes your account and cloud data. This action cannot be undone.',
-    );
+    const confirmed = window.confirm(dict.auth.deleteAccountDescription);
 
     if (!confirmed) return;
 
-    const reauthPassword = window.prompt(
-      'For security, please re-enter your password.',
-    );
+    const reauthPassword = window.prompt(dict.auth.reenterPasswordDescription);
 
     if (reauthPassword === null) return;
 
     if (!reauthPassword.trim()) {
-      auth.setErrorMessage('Please enter your password.');
+      auth.setErrorMessage(dict.auth.pleaseEnterPassword);
       return;
     }
 
     if (!auth.user) {
-      auth.setErrorMessage('No signed-in user found.');
+      auth.setErrorMessage(dict.auth.noSignedInUser);
       return;
     }
 
@@ -3121,10 +3193,10 @@ function AuthModal({
               className='mx-auto text-blue-500'
             />
 
-            <h2 className='text-[22px] font-bold'>Signed in</h2>
+            <h2 className='text-[22px] font-bold'>{dict.auth.signedIn}</h2>
             <p className='text-[14px] text-gray-500'>{auth.user?.email}</p>
             <p className='text-[14px] text-gray-500'>
-              Your planner syncs automatically across devices.
+              {dict.auth.syncsAutomatically}
             </p>
 
             {(syncError || auth.errorMessage) && (
@@ -3135,7 +3207,7 @@ function AuthModal({
 
             {lastSyncedAt && (
               <p className='text-[12px] text-gray-500'>
-                Last updated:{' '}
+                {dict.auth.lastUpdated}:{' '}
                 {lastSyncedAt.toLocaleString('en-US', {
                   dateStyle: 'medium',
                   timeStyle: 'short',
@@ -3149,7 +3221,7 @@ function AuthModal({
               className='inline-flex items-center justify-center gap-1 text-red-500 disabled:opacity-50'
             >
               <LogOut size={16} />
-              Sign Out
+              {dict.auth.signOut}
             </button>
 
             <button
@@ -3157,7 +3229,9 @@ function AuthModal({
               disabled={isDeletingAccount}
               className='block w-full py-2 text-[13px] text-gray-300 disabled:opacity-50'
             >
-              {isDeletingAccount ? 'Deleting Account...' : 'Delete Account'}
+              {isDeletingAccount
+                ? dict.auth.deletingAccount
+                : dict.auth.deleteAccount}
             </button>
           </div>
         </div>
@@ -3176,13 +3250,13 @@ function AuthModal({
       >
         <div className='space-y-4'>
           <h2 className='text-center text-[22px] font-bold'>
-            {isCreatingAccount ? 'Create Account' : 'Login'}
+            {isCreatingAccount ? dict.auth.createAccount : dict.auth.login}
           </h2>
 
           <p className='text-center text-[14px] text-gray-500'>
             {isCreatingAccount
-              ? 'Create an account to sync your planner.'
-              : 'Log in to sync your planner across devices.'}
+              ? dict.auth.createAccountDescription
+              : dict.auth.loginTitle}
           </p>
 
           <input
@@ -3191,14 +3265,14 @@ function AuthModal({
               setEmail(e.target.value);
               setSuccessMessage(null);
             }}
-            placeholder='Email'
+            placeholder={dict.auth.email}
             className='w-full rounded-[14px] bg-[#f2f2f7] p-4 outline-none'
           />
 
           <input
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder='Password'
+            placeholder={dict.auth.password}
             type='password'
             className='w-full rounded-[14px] bg-[#f2f2f7] p-4 outline-none'
           />
@@ -3207,7 +3281,7 @@ function AuthModal({
             <input
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder='Confirm Password'
+              placeholder={dict.auth.confirmPassword}
               type='password'
               className='w-full rounded-[14px] bg-[#f2f2f7] p-4 outline-none'
             />
@@ -3227,10 +3301,10 @@ function AuthModal({
             className='w-full rounded-[16px] bg-blue-500 p-4 font-semibold text-white disabled:opacity-50'
           >
             {auth.isLoading
-              ? 'Please wait...'
+              ? dict.auth.pleaseWait
               : isCreatingAccount
-                ? 'Create Account'
-                : 'Log In'}
+                ? dict.auth.createAccount
+                : dict.auth.logIn}
           </button>
 
           {!isCreatingAccount && (
@@ -3240,7 +3314,7 @@ function AuthModal({
               disabled={auth.isLoading}
               className='w-full text-[14px] font-medium text-gray-500 disabled:opacity-50'
             >
-              Forgot password?
+              {dict.auth.forgotPassword}
             </button>
           )}
 
@@ -3253,8 +3327,8 @@ function AuthModal({
             className='w-full text-[14px] text-blue-500'
           >
             {isCreatingAccount
-              ? 'Already have an account? Log in'
-              : 'New here? Create account'}
+              ? dict.auth.alreadyHaveAccount
+              : dict.auth.newHere}
           </button>
         </div>
       </div>

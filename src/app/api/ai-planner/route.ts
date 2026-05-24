@@ -2,6 +2,7 @@
 
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import type { Locale } from '@/i18n/types';
 
 export const runtime = 'nodejs';
 
@@ -9,23 +10,45 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function POST(request: Request) {
-  try {
-    const { message } = await request.json();
+const AI_LOCALE = {
+  en: {
+    language: 'English',
+    sections: {
+      goal: 'Goal',
+      why: 'Why this matters',
+      thisWeek: 'This Week',
+      monday: 'Monday',
+      tuesday: 'Tuesday',
+      wednesday: 'Wednesday',
+      thursday: 'Thursday',
+      friday: 'Friday',
+      saturday: 'Saturday',
+      sunday: 'Sunday',
+      tinyFirstStep: 'Tiny First Step',
+    },
+  },
+  ko: {
+    language: 'Korean',
+    sections: {
+      goal: '목표',
+      why: '왜 중요한가',
+      thisWeek: '이번 주',
+      monday: '월요일',
+      tuesday: '화요일',
+      wednesday: '수요일',
+      thursday: '목요일',
+      friday: '금요일',
+      saturday: '토요일',
+      sunday: '일요일',
+      tinyFirstStep: '아주 작은 첫걸음',
+    },
+  },
+} as const;
 
-    if (!message || typeof message !== 'string') {
-      return NextResponse.json(
-        { error: 'Message is required.' },
-        { status: 400 },
-      );
-    }
+function getAiPrompt(locale: Locale) {
+  const t = AI_LOCALE[locale] ?? AI_LOCALE.en;
 
-    const response = await openai.responses.create({
-      model: 'gpt-4.1-mini',
-      input: [
-        {
-          role: 'system',
-          content: `
+  return `
 You are Weekboard AI.
 
 You are an expert weekly planning coach.
@@ -50,43 +73,44 @@ Planning philosophy:
 - beginner-friendly plans are preferred
 - users should feel "I can actually do this"
 
-Always structure the response in this format:
+Always answer in ${t.language}.
 
-Goal
+Always use these exact section titles:
+
+${t.sections.goal}
 - one clear sentence
 
-Why this matters
+${t.sections.why}
 - short practical explanation
 
-This Week
+${t.sections.thisWeek}
 - 3 to 5 realistic weekly goals
 
-Monday
+${t.sections.monday}
 - max 3 concrete tasks
 
-Tuesday
+${t.sections.tuesday}
 - max 3 concrete tasks
 
-Wednesday
+${t.sections.wednesday}
 - max 3 concrete tasks
 
-Thursday
+${t.sections.thursday}
 - max 3 concrete tasks
 
-Friday
+${t.sections.friday}
 - max 3 concrete tasks
 
-Saturday
+${t.sections.saturday}
 - lighter tasks if possible
 
-Sunday
+${t.sections.sunday}
 - reflection, reset, preparation, or rest
 
-Tiny First Step
+${t.sections.tinyFirstStep}
 - one action the user can do in under 5 minutes
 
 Rules:
-- Answer in English
 - Keep responses concise but useful
 - Use simple language
 - Avoid long paragraphs
@@ -95,7 +119,28 @@ Rules:
 - Tasks must be observable actions
 - Avoid unrealistic productivity plans
 - Prefer consistency over intensity
-`,
+`;
+}
+
+export async function POST(request: Request) {
+  try {
+    const { message, locale = 'en' } = await request.json();
+
+    if (!message || typeof message !== 'string') {
+      return NextResponse.json(
+        { error: 'Message is required.' },
+        { status: 400 },
+      );
+    }
+
+    const safeLocale: Locale = locale === 'ko' ? 'ko' : 'en';
+
+    const response = await openai.responses.create({
+      model: 'gpt-4.1-mini',
+      input: [
+        {
+          role: 'system',
+          content: getAiPrompt(safeLocale),
         },
         {
           role: 'user',

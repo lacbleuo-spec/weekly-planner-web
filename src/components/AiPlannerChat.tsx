@@ -1,9 +1,10 @@
-// AiPlannerChat.tsx
-
 'use client';
 
 import { useState } from 'react';
 import { Bot, MessageCircle, Send, X } from 'lucide-react';
+
+import { dictionaries } from '@/i18n/dictionaries';
+import type { Locale } from '@/i18n/types';
 
 type AiMessage = {
   role: 'user' | 'assistant';
@@ -13,12 +14,16 @@ type AiMessage = {
 type AiPlannerChatProps = {
   isLoggedIn: boolean;
   onRequireLogin: () => void;
+  locale: Locale;
 };
 
 export function AiPlannerChat({
   isLoggedIn,
   onRequireLogin,
+  locale,
 }: AiPlannerChatProps) {
+  const dict = dictionaries[locale];
+
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<AiMessage[]>([]);
@@ -53,13 +58,14 @@ export function AiPlannerChat({
         },
         body: JSON.stringify({
           message,
+          locale,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error ?? 'Failed to create AI plan.');
+        throw new Error(data.error ?? dict.ai.error);
       }
 
       setMessages((prev) => [
@@ -74,8 +80,7 @@ export function AiPlannerChat({
         ...prev,
         {
           role: 'assistant',
-          content:
-            'Sorry, I cannot create a plan right now. Please try again later.',
+          content: dict.ai.error,
         },
       ]);
     } finally {
@@ -96,7 +101,7 @@ export function AiPlannerChat({
           setIsOpen(true);
         }}
         className='fixed bottom-5 right-5 z-[9998] flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-[0_14px_40px_rgba(0,0,0,0.18)] transition active:scale-95'
-        aria-label='Open AI planner'
+        aria-label={dict.accessibility.openAIPlanner}
       >
         <MessageCircle size={24} />
       </button>
@@ -110,11 +115,9 @@ export function AiPlannerChat({
               </div>
 
               <div>
-                <h2 className='text-[16px] font-semibold'>AI Planner</h2>
+                <h2 className='text-[16px] font-semibold'>{dict.ai.title}</h2>
 
-                <p className='text-[12px] text-gray-500'>
-                  Turn vague goals into plans
-                </p>
+                <p className='text-[12px] text-gray-500'>{dict.ai.subtitle}</p>
               </div>
             </div>
 
@@ -122,7 +125,7 @@ export function AiPlannerChat({
               type='button'
               onClick={() => setIsOpen(false)}
               className='flex h-8 w-8 items-center justify-center rounded-full text-gray-500 active:bg-gray-100'
-              aria-label='Close AI planner'
+              aria-label={dict.accessibility.closeAIPlanner}
             >
               <X size={18} />
             </button>
@@ -132,11 +135,11 @@ export function AiPlannerChat({
             {messages.length === 0 && (
               <div className='rounded-[18px] bg-[#f2f2f7] p-4'>
                 <p className='text-[15px] leading-6 text-gray-600'>
-                  Write down a vague goal.
+                  {dict.ai.emptyMessage}
                   <br />
-                  Example: I want to build an exercise habit
+                  {dict.ai.exerciseExample}
                   <br />
-                  Example: I want to study English consistently
+                  {dict.ai.studyExample}
                 </p>
               </div>
             )}
@@ -156,7 +159,7 @@ export function AiPlannerChat({
 
             {isLoading && (
               <div className='mr-8 rounded-[18px] bg-[#f2f2f7] p-3 text-[15px] text-gray-500'>
-                Creating your plan...
+                {dict.ai.loading}
               </div>
             )}
           </div>
@@ -177,7 +180,7 @@ export function AiPlannerChat({
                   sendMessage();
                 }
               }}
-              placeholder='Type your goal'
+              placeholder={dict.ai.placeholder}
               className='min-w-0 flex-1 rounded-[16px] bg-[#f2f2f7] px-4 py-3 text-[15px] outline-none placeholder:text-gray-500'
             />
 
@@ -186,7 +189,7 @@ export function AiPlannerChat({
               onClick={sendMessage}
               disabled={isLoading}
               className='flex h-12 w-12 items-center justify-center rounded-[16px] bg-blue-500 text-white disabled:opacity-50'
-              aria-label='Send message'
+              aria-label={dict.accessibility.sendMessage}
             >
               <Send size={18} />
             </button>

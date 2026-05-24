@@ -1,3 +1,5 @@
+// PlannerResponsiveLayout
+
 'use client';
 
 import { dayKey } from '@/lib/date';
