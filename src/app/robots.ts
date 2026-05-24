@@ -6,6 +6,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: '*',
       allow: '/',
     },
-    sitemap: 'https://www.weeklygoalplanner.com/sitemap.xml',
+    sitemap: 'https://www.weekboard.net/sitemap.xml',
   };
 }

@@ -1,3 +1,5 @@
+// AiPlannerChat.tsx
+
 'use client';
 
 import { useState } from 'react';
@@ -8,13 +10,26 @@ type AiMessage = {
   content: string;
 };
 
-export function AiPlannerChat() {
+type AiPlannerChatProps = {
+  isLoggedIn: boolean;
+  onRequireLogin: () => void;
+};
+
+export function AiPlannerChat({
+  isLoggedIn,
+  onRequireLogin,
+}: AiPlannerChatProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<AiMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   async function sendMessage() {
+    if (!isLoggedIn) {
+      onRequireLogin();
+      return;
+    }
+
     const message = input.trim();
 
     if (!message || isLoading) return;
@@ -72,7 +87,14 @@ export function AiPlannerChat() {
     <>
       <button
         type='button'
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          if (!isLoggedIn) {
+            onRequireLogin();
+            return;
+          }
+
+          setIsOpen(true);
+        }}
         className='fixed bottom-5 right-5 z-[9998] flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-[0_14px_40px_rgba(0,0,0,0.18)] transition active:scale-95'
         aria-label='Open AI planner'
       >
@@ -143,6 +165,11 @@ export function AiPlannerChat() {
             <input
               value={input}
               onChange={(event) => setInput(event.target.value)}
+              onFocus={() => {
+                if (!isLoggedIn) {
+                  onRequireLogin();
+                }
+              }}
               onKeyDown={(event) => {
                 if (event.nativeEvent.isComposing) return;
 

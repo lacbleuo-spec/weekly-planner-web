@@ -1393,7 +1393,10 @@ export default function PlannerApp() {
         }}
       />
 
-      <AiPlannerChat />
+      <AiPlannerChat
+        isLoggedIn={auth.isLoggedIn}
+        onRequireLogin={() => setShowAuthModal(true)}
+      />
 
       <style jsx global>{`
         :root,
