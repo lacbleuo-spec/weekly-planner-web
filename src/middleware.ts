@@ -1,4 +1,3 @@
-// middleware.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { defaultLocale, locales } from '@/i18n/settings';
 import type { Locale } from '@/i18n/types';
@@ -24,6 +23,7 @@ export function middleware(request: NextRequest) {
     pathname === '/sitemap.xml' ||
     pathname === '/robots.txt' ||
     pathname === '/opengraph-image' ||
+    pathname === '/og-image.png' ||
     pathname === '/favicon.ico' ||
     pathname === '/apple-touch-icon.png'
   ) {
@@ -46,6 +46,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next|favicon.ico|apple-touch-icon.png|robots.txt|sitemap.xml|opengraph-image|.*\\..*).*)',
+    '/((?!api|_next|favicon.ico|apple-touch-icon.png|robots.txt|sitemap.xml|opengraph-image|og-image.png|.*\\..*).*)',
   ],
 };
