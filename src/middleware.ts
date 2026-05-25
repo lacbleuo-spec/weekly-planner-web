@@ -22,27 +22,31 @@ export function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
   const pathname = request.nextUrl.pathname;
 
-  // weekboard.net -> www.weekboard.net
-  if (request.nextUrl.hostname === 'weekboard.net') {
-    url.hostname = 'www.weekboard.net';
-    return NextResponse.redirect(url, 308);
-  }
-
   const hasLocale = locales.some(
     (locale) => pathname === `/${locale}` || pathname.startsWith(`/${locale}/`),
   );
+
+  if (request.nextUrl.hostname === 'weekboard.net') {
+    url.hostname = 'www.weekboard.net';
+
+    if (!hasLocale) {
+      const locale = getPreferredLocale(request);
+      url.pathname = `/${locale}${pathname}`;
+    }
+
+    return NextResponse.redirect(url, 308);
+  }
 
   if (hasLocale) {
     return NextResponse.next();
   }
 
   const locale = getPreferredLocale(request);
-
   url.pathname = `/${locale}${pathname}`;
 
   return NextResponse.redirect(url, 308);
 }
 
 export const config = {
-  matcher: ['/', '/(en|ko|ja|zh|es|fr|de)/:path*'],
+  matcher: ['/((?!api|_next|favicon.ico|apple-touch-icon.png).*)'],
 };
