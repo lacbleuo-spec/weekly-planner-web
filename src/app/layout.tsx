@@ -16,12 +16,22 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://www.weekboard.net'),
 
   openGraph: {
-    images: ['/opengraph-image'],
+    title: 'Weekboard',
+    description:
+      'Weekboard is an AI-powered weekly planner that turns vague goals into realistic weekly plans.',
+    images: [
+      {
+        url: 'https://www.weekboard.net/opengraph-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Weekboard',
+      },
+    ],
   },
 
   twitter: {
     card: 'summary_large_image',
-    images: ['/opengraph-image'],
+    images: ['https://www.weekboard.net/opengraph-image.png'],
   },
 
   icons: {
