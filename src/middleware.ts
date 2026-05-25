@@ -20,6 +20,16 @@ function getPreferredLocale(request: NextRequest): Locale {
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
+  if (
+    pathname === '/sitemap.xml' ||
+    pathname === '/robots.txt' ||
+    pathname === '/opengraph-image' ||
+    pathname === '/favicon.ico' ||
+    pathname === '/apple-touch-icon.png'
+  ) {
+    return NextResponse.next();
+  }
+
   const hasLocale = locales.some(
     (locale) => pathname === `/${locale}` || pathname.startsWith(`/${locale}/`),
   );
@@ -35,5 +45,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next|favicon.ico|apple-touch-icon.png).*)'],
+  matcher: [
+    '/((?!api|_next|favicon.ico|apple-touch-icon.png|robots.txt|sitemap.xml|opengraph-image|.*\\..*).*)',
+  ],
 };
