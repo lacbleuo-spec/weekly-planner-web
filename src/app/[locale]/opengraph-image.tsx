@@ -1,3 +1,5 @@
+// src/app/[locale]/opengraph-image.tsx
+
 import { ImageResponse } from 'next/og';
 
 export const size = {

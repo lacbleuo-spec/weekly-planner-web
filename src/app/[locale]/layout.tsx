@@ -1,3 +1,5 @@
+// src/app/[locale]/layout.tsx
+
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';

@@ -1,3 +1,5 @@
+// src/app/[locale]/page.tsx
+
 import { notFound } from 'next/navigation';
 
 import PlannerApp from '@/components/PlannerApp';

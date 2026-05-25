@@ -1,3 +1,5 @@
+// middleware.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { defaultLocale, locales } from '@/i18n/settings';
 import type { Locale } from '@/i18n/types';
@@ -17,7 +19,14 @@ function getPreferredLocale(request: NextRequest): Locale {
 }
 
 export function middleware(request: NextRequest) {
+  const url = request.nextUrl.clone();
   const pathname = request.nextUrl.pathname;
+
+  // weekboard.net -> www.weekboard.net
+  if (request.nextUrl.hostname === 'weekboard.net') {
+    url.hostname = 'www.weekboard.net';
+    return NextResponse.redirect(url, 308);
+  }
 
   const hasLocale = locales.some(
     (locale) => pathname === `/${locale}` || pathname.startsWith(`/${locale}/`),
@@ -28,11 +37,10 @@ export function middleware(request: NextRequest) {
   }
 
   const locale = getPreferredLocale(request);
-  const url = request.nextUrl.clone();
 
   url.pathname = `/${locale}${pathname}`;
 
-  return NextResponse.redirect(url);
+  return NextResponse.redirect(url, 308);
 }
 
 export const config = {
