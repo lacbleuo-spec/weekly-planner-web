@@ -16,26 +16,51 @@ export default function OpenGraphImage() {
         width: '100%',
         height: '100%',
         display: 'flex',
-        flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        background: '#111113',
-        color: 'white',
-        fontSize: 72,
-        fontWeight: 700,
+        background: '#f2f2f7',
+        padding: '48px',
       }}
     >
-      <div>Weekboard</div>
-
       <div
         style={{
-          marginTop: 24,
-          fontSize: 32,
-          fontWeight: 400,
-          color: '#a1a1aa',
+          width: '100%',
+          height: '100%',
+          borderRadius: 40,
+          background: '#ffffff',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          padding: '96px',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.08)',
         }}
       >
-        AI Weekly Goal Planner
+        <div
+          style={{
+            fontSize: 92,
+            fontWeight: 800,
+            color: '#111827',
+            letterSpacing: '-3px',
+            lineHeight: 1,
+          }}
+        >
+          Weekboard
+        </div>
+
+        <div
+          style={{
+            marginTop: 36,
+            fontSize: 34,
+            lineHeight: 1.45,
+            color: '#4b5563',
+            maxWidth: 860,
+          }}
+        >
+          Weekboard is an AI-powered weekly planner that turns vague goals into
+          realistic weekly plans. Organize goals into daily tasks, create
+          recurring routines, and stay consistent with reminders, locks, and
+          achievement tracking.
+        </div>
       </div>
     </div>,
     {
