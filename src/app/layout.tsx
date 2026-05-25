@@ -17,33 +17,6 @@ export const metadata: Metadata = {
 
   metadataBase: new URL('https://www.weekboard.net'),
 
-  openGraph: {
-    title: 'Weekboard',
-
-    description:
-      'Weekboard is an AI-powered weekly planner that turns vague goals into realistic weekly plans. Organize goals into daily tasks, create recurring routines, and stay consistent with reminders, locks, and achievement tracking.',
-
-    images: [
-      {
-        url: 'https://www.weekboard.net/og-image.png',
-        width: 1200,
-        height: 630,
-        alt: 'Weekboard',
-      },
-    ],
-  },
-
-  twitter: {
-    card: 'summary_large_image',
-
-    title: 'Weekboard',
-
-    description:
-      'Weekboard is an AI-powered weekly planner that turns vague goals into realistic weekly plans. Organize goals into daily tasks, create recurring routines, and stay consistent with reminders, locks, and achievement tracking.',
-
-    images: ['https://www.weekboard.net/og-image.png'],
-  },
-
   icons: {
     icon: '/favicon.ico',
     apple: '/apple-touch-icon.png',
