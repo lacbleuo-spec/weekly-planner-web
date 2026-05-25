@@ -98,10 +98,9 @@
   },
   "ai": {
     "title": "AI Planner",
-    "subtitle": "Turn vague goals into plans",
+    "subtitle": "Turn vague goals into actionable weekly goals",
     "emptyMessage": "Write down a vague goal.",
-    "exerciseExample": "Example: I want to build an exercise habit",
-    "studyExample": "Example: I want to study English consistently",
+    "studyExample": "Example: I want to get better at English",
     "placeholder": "Type your goal",
     "loading": "Creating your plan...",
     "error": "Sorry, I cannot create a plan right now. Please try again later."
@@ -176,6 +175,11 @@
   "language": {
     "label": "Language",
     "english": "English",
-    "korean": "Korean"
+    "korean": "Korean",
+    "japanese": "Japanese",
+    "chinese": "Chinese",
+    "spanish": "Spanish",
+    "french": "French",
+    "german": "German"
   }
 }

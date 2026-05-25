@@ -1,10 +1,16 @@
+// settings.ts
 import type { Locale } from './types';
 
-export const locales: Locale[] = ['en', 'ko'];
+export const locales: Locale[] = ['en', 'ko', 'ja', 'zh', 'es', 'fr', 'de'];
 
 export const defaultLocale: Locale = 'en';
 
 export const localeLabels: Record<Locale, string> = {
   en: 'English',
   ko: '한국어',
+  ja: '日本語',
+  zh: '中文',
+  es: 'Español',
+  fr: 'Français',
+  de: 'Deutsch',
 };

@@ -745,8 +745,8 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     syncSomedayGoalChange(nextGoals, updatedGoal);
   }
 
-  function addWeeklyGoal() {
-    const text = newWeeklyGoalText.trim();
+  function addWeeklyGoal(title?: string) {
+    const text = (title ?? newWeeklyGoalText).trim();
     if (!text) return;
 
     const plan = currentPlan ?? makeCurrentWeekPlan();
@@ -770,7 +770,10 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
       weeklyGoals: [...plan.weeklyGoals, goal],
     };
 
-    setNewWeeklyGoalText('');
+    if (!title) {
+      setNewWeeklyGoalText('');
+    }
+
     syncWeeklyGoalChange(updatedPlan, goal);
   }
 
@@ -1439,6 +1442,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
         isLoggedIn={auth.isLoggedIn}
         onRequireLogin={() => setShowAuthModal(true)}
         locale={locale}
+        onAddWeeklyGoal={(title) => addWeeklyGoal(title)}
       />
 
       <style jsx global>{`
@@ -2625,7 +2629,7 @@ function GoalRow({
             <div className='relative z-10 w-full max-w-md animate-in slide-in-from-bottom-3 duration-200 rounded-[24px] bg-white p-6'>
               <div className='space-y-4'>
                 <div className='text-center'>
-                  <h2 className='text-[22px] font-bold'>
+                  <h2 className='text-[22px] font-bold text-[var(--planner-text)]'>
                     {dict.planner.copyWeeklyGoal}
                   </h2>
                   <p className='mt-2 text-[14px] text-gray-500'>
