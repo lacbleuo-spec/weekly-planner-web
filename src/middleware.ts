@@ -28,9 +28,11 @@ export function middleware(request: NextRequest) {
   }
 
   const locale = getPreferredLocale(request);
-  request.nextUrl.pathname = `/${locale}${pathname}`;
+  const url = request.nextUrl.clone();
 
-  return NextResponse.redirect(request.nextUrl);
+  url.pathname = `/${locale}${pathname}`;
+
+  return NextResponse.redirect(url);
 }
 
 export const config = {
