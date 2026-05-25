@@ -5,6 +5,8 @@ import type { ReactNode } from 'react';
 import { locales } from '@/i18n/settings';
 import type { Locale } from '@/i18n/types';
 
+const OG_IMAGE_URL = 'https://www.weekboard.net/og-image.png';
+
 const seo: Record<
   Locale,
   {
@@ -168,12 +170,21 @@ export async function generateMetadata({
       siteName: 'Weekboard',
       type: 'website',
       locale: safeLocale,
+      images: [
+        {
+          url: OG_IMAGE_URL,
+          width: 1200,
+          height: 630,
+          alt: 'Weekboard',
+        },
+      ],
     },
 
     twitter: {
-      card: 'summary',
+      card: 'summary_large_image',
       title: item.title,
       description: item.description,
+      images: [OG_IMAGE_URL],
     },
 
     alternates: {
@@ -205,8 +216,6 @@ export default async function LocaleLayout({
   if (!locales.includes(locale as Locale)) {
     notFound();
   }
-
-  const safeLocale = locale as Locale;
 
   return children;
 }
