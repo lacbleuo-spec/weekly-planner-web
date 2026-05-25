@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { locales } from '@/i18n/settings';
 import type { Locale } from '@/i18n/types';
 
-const OG_IMAGE_URL = 'https://www.weekboard.net/og-image.png';
+const BASE_URL = 'https://www.weekboard.net';
 
 const seo: Record<
   Locale,
@@ -157,8 +157,11 @@ export async function generateMetadata({
 
   const safeLocale = locale as Locale;
   const item = seo[safeLocale];
+  const ogImageUrl = `/${safeLocale}/opengraph-image`;
 
   return {
+    metadataBase: new URL(BASE_URL),
+
     title: item.title,
     description: item.description,
     keywords: item.keywords,
@@ -166,13 +169,13 @@ export async function generateMetadata({
     openGraph: {
       title: item.title,
       description: item.description,
-      url: `https://www.weekboard.net/${safeLocale}`,
+      url: `${BASE_URL}/${safeLocale}`,
       siteName: 'Weekboard',
       type: 'website',
       locale: safeLocale,
       images: [
         {
-          url: OG_IMAGE_URL,
+          url: ogImageUrl,
           width: 1200,
           height: 630,
           alt: 'Weekboard',
@@ -184,19 +187,19 @@ export async function generateMetadata({
       card: 'summary_large_image',
       title: item.title,
       description: item.description,
-      images: [OG_IMAGE_URL],
+      images: [ogImageUrl],
     },
 
     alternates: {
-      canonical: `https://www.weekboard.net/${safeLocale}`,
+      canonical: `${BASE_URL}/${safeLocale}`,
       languages: {
-        en: 'https://www.weekboard.net/en',
-        ko: 'https://www.weekboard.net/ko',
-        de: 'https://www.weekboard.net/de',
-        es: 'https://www.weekboard.net/es',
-        fr: 'https://www.weekboard.net/fr',
-        ja: 'https://www.weekboard.net/ja',
-        zh: 'https://www.weekboard.net/zh',
+        en: `${BASE_URL}/en`,
+        ko: `${BASE_URL}/ko`,
+        de: `${BASE_URL}/de`,
+        es: `${BASE_URL}/es`,
+        fr: `${BASE_URL}/fr`,
+        ja: `${BASE_URL}/ja`,
+        zh: `${BASE_URL}/zh`,
       },
     },
   };
