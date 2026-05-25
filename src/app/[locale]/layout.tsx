@@ -208,9 +208,5 @@ export default async function LocaleLayout({
 
   const safeLocale = locale as Locale;
 
-  return (
-    <html lang={safeLocale}>
-      <body>{children}</body>
-    </html>
-  );
+  return children;
 }
