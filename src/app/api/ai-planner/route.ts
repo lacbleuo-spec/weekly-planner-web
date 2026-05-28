@@ -1,3 +1,5 @@
+// route.ts
+
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import type { Locale } from '@/i18n/types';

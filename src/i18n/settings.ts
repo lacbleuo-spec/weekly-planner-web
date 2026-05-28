@@ -1,4 +1,5 @@
 // settings.ts
+
 import type { Locale } from './types';
 
 export const locales: Locale[] = ['en', 'ko', 'ja', 'zh', 'es', 'fr', 'de'];
