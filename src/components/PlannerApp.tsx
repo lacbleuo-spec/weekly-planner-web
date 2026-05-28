@@ -669,7 +669,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     const goal: FirebaseSomedayGoal = {
       id: makeId(),
       title: text,
-      label: 'A',
+      label: 'Z',
       order: visibleSomedayGoals.length,
       createdAt: now(),
       updatedAt: now(),
@@ -755,7 +755,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     const goal: FirebaseWeeklyGoal = {
       id: makeId(),
       title: text,
-      label: 'A',
+      label: 'Z',
       time: null,
       reminder: 'none',
       order: weeklyGoals.length,
@@ -943,7 +943,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     const goal: FirebaseDailyGoal = {
       id: makeId(),
       title: text,
-      label: 'A',
+      label: 'Z',
       date: Timestamp.fromDate(date),
       isCompleted: false,
       kind: 'deletable',
@@ -972,7 +972,6 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
       (goal) => goal.id === goalId,
     );
     if (!targetGoal) return;
-    if (isPastDay(targetGoal.date.toDate())) return;
 
     const updatedGoal = {
       ...targetGoal,
@@ -1400,7 +1399,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
                       <DailyGoalRow
                         goal={goal}
                         canMove={true}
-                        canToggle={!isPastDay(goal.date.toDate())}
+                        canToggle={true}
                         onToggle={() => toggleDailyGoal(goal.id)}
                         onMove={(direction) =>
                           moveDailyGoal(goal.id, date, direction)
@@ -2425,7 +2424,11 @@ function AddInput({
         className='min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-gray-500'
       />
 
-      <button onClick={onSubmit} className='text-blue-500'>
+      <button
+        type='button'
+        onClick={() => onSubmit()}
+        className='text-blue-500'
+      >
         <span className='flex h-[22px] w-[22px] items-center justify-center rounded-full bg-blue-500 text-white'>
           <Plus size={15} strokeWidth={3} />
         </span>
