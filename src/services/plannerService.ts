@@ -1,4 +1,4 @@
-// plannerService
+// plannerService.ts
 
 import {
   collection,

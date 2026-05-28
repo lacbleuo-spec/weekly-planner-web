@@ -1,4 +1,4 @@
-// useTheme
+// useTheme.ts
 
 'use client';
 

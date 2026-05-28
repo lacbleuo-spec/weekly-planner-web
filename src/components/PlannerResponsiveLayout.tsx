@@ -1,4 +1,4 @@
-// PlannerResponsiveLayout
+// PlannerResponsiveLayout.tsx
 
 'use client';
 

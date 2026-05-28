@@ -1,4 +1,4 @@
-// planner
+// planner.ts
 
 import { Timestamp } from 'firebase/firestore';
 

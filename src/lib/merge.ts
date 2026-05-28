@@ -1,4 +1,4 @@
-// merge
+// merge.ts
 
 import {
   FirebaseDailyGoal,

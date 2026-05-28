@@ -1,4 +1,4 @@
-// date
+// date.ts
 
 export function startOfWeek(date: Date): Date {
   const result = new Date(date);

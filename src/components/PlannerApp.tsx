@@ -1,4 +1,4 @@
-// PlannerApp
+// PlannerApp.tsx
 
 'use client';
 

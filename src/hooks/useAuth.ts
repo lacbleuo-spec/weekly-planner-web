@@ -1,4 +1,4 @@
-// useAuth
+// useAuth.ts
 
 'use client';
 

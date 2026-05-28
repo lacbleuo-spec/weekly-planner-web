@@ -1,3 +1,5 @@
+// AiPlannerChat.tsx // 7:12
+
 'use client';
 
 import { useState } from 'react';
@@ -166,20 +168,23 @@ export function AiPlannerChat({
 
           setIsOpen(true);
         }}
-        className='fixed bottom-5 right-5 z-[9998] flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-[0_14px_40px_rgba(0,0,0,0.18)] transition active:scale-95'
+        className='fixed bottom-5 right-5 z-[9998] flex h-12 items-center gap-2 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 px-4 text-white shadow-[0_14px_40px_rgba(0,0,0,0.18)] transition active:scale-95'
         aria-label={dict.accessibility.openAIPlanner}
       >
-        <MessageCircle size={24} />
+        <span className='text-[15px]' aria-hidden='true'>
+          ✨
+        </span>
+
+        <span className='text-[15px] font-semibold tracking-[-0.02em]'>
+          {dict.ai.title}
+        </span>
       </button>
 
       {isOpen && (
         <div className='fixed bottom-24 right-5 z-[9999] flex h-[560px] w-[360px] max-w-[calc(100vw-40px)] flex-col overflow-hidden rounded-[24px] border border-gray-100 bg-white shadow-[0_18px_50px_rgba(0,0,0,0.18)]'>
           <div className='flex items-center justify-between border-b border-gray-100 p-4'>
             <div className='flex items-center gap-2'>
-              <div className='flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-500'>
-                <Bot size={18} />
-              </div>
-
+              ✨
               <div>
                 <h2 className='text-[16px] font-semibold'>{dict.ai.title}</h2>
                 <p className='text-[12px] text-gray-500'>{dict.ai.subtitle}</p>
