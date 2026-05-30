@@ -1,10 +1,9 @@
-// AiPlannerChat.tsx // 7:12
-
 'use client';
 
 import { useState } from 'react';
-import { Bot, MessageCircle, Send, X } from 'lucide-react';
+import { Send, X } from 'lucide-react';
 
+import { auth } from '@/lib/firebase';
 import { dictionaries } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/types';
 
@@ -98,6 +97,13 @@ export function AiPlannerChat({
 
     if (!message || isLoading) return;
 
+    const token = await auth.currentUser?.getIdToken();
+
+    if (!token) {
+      onRequireLogin();
+      return;
+    }
+
     setInput('');
     setMessages((prev) => [
       ...prev,
@@ -114,6 +120,7 @@ export function AiPlannerChat({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           message,

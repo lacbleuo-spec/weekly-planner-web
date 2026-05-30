@@ -1,8 +1,7 @@
-// route.ts
-
+import { adminAuth } from '@/lib/firebaseAdmin';
+import type { Locale } from '@/i18n/types';
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import type { Locale } from '@/i18n/types';
 
 export const runtime = 'nodejs';
 
@@ -159,11 +158,32 @@ Rules:
 
 export async function POST(request: Request) {
   try {
+    const authorization = request.headers.get('authorization');
+
+    if (!authorization?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+    }
+
+    const token = authorization.replace('Bearer ', '').trim();
+
+    try {
+      await adminAuth.verifyIdToken(token);
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+    }
+
     const { message, locale = 'en' } = await request.json();
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
         { error: 'Message is required.' },
+        { status: 400 },
+      );
+    }
+
+    if (message.length > 500) {
+      return NextResponse.json(
+        { error: 'Message is too long.' },
         { status: 400 },
       );
     }
