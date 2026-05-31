@@ -1878,7 +1878,7 @@ function CalendarPopover({
     1,
   );
 
-  const startOffset = (monthStart.getDay() + 6) % 7;
+  const startOffset = monthStart.getDay();
   const calendarStart = addingDays(monthStart, -startOffset);
 
   const dates = Array.from({ length: 42 }, (_, index) =>
@@ -3031,8 +3031,8 @@ function TimeReminderModal({
               <option value='10m'>10 {dict.planner.minutesBefore}</option>
               <option value='15m'>15 {dict.planner.minutesBefore}</option>
               <option value='30m'>30 {dict.planner.minutesBefore}</option>
-              <option value='1h'>1 {dict.planner.hourBefore}</option>
-              <option value='1d'>1 {dict.planner.dayBefore}</option>
+              <option value='1h'>{dict.planner.hourBefore}</option>
+              <option value='1d'>{dict.planner.dayBefore}</option>
             </select>
 
             <ChevronDown

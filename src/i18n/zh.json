@@ -109,7 +109,7 @@
     "previousMonth": "上个月",
     "nextMonth": "下个月",
     "closeCalendar": "关闭日历",
-    "weekdayHeaders": ["一", "二", "三", "四", "五", "六", "日"],
+    "weekdayHeaders": ["日", "一", "二", "三", "四", "五", "六"],
     "monthYear": "{year}年{month}",
     "monthNames": [
       "一月",
@@ -181,5 +181,10 @@
     "spanish": "西班牙语",
     "french": "法语",
     "german": "德语"
+  },
+  "weekStartOptions": {
+    "label": "每周开始日",
+    "sunday": "周日开始",
+    "monday": "周一开始"
   }
 }

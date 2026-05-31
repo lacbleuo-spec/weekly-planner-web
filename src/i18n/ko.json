@@ -109,7 +109,7 @@
     "previousMonth": "이전 달",
     "nextMonth": "다음 달",
     "closeCalendar": "달력 닫기",
-    "weekdayHeaders": ["월", "화", "수", "목", "금", "토", "일"],
+    "weekdayHeaders": ["일", "월", "화", "수", "목", "금", "토"],
     "monthYear": "{year}년 {month}",
     "monthNames": [
       "1월",
@@ -181,5 +181,10 @@
     "spanish": "스페인어",
     "french": "프랑스어",
     "german": "독일어"
+  },
+  "weekStartOptions": {
+    "label": "주 시작",
+    "sunday": "일 시작",
+    "monday": "월 시작"
   }
 }

@@ -2,10 +2,9 @@
 
 export function startOfWeek(date: Date): Date {
   const result = new Date(date);
-  const day = result.getDay(); // Sunday 0, Monday 1
-  const diff = day === 0 ? -6 : 1 - day;
+  const day = result.getDay(); // Sunday 0
 
-  result.setDate(result.getDate() + diff);
+  result.setDate(result.getDate() - day);
   result.setHours(0, 0, 0, 0);
 
   return result;

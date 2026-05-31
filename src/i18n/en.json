@@ -77,8 +77,8 @@
     "noReminder": "No reminder",
     "atEventTime": "At event time",
     "minutesBefore": "minutes before",
-    "hourBefore": "hour before",
-    "dayBefore": "day before",
+    "hourBefore": "1 hour before",
+    "dayBefore": "1 day before",
     "selected": "selected",
     "noTimeSelected": "No time selected",
     "lockThisGoal": "Lock this goal?",
@@ -109,7 +109,7 @@
     "previousMonth": "Previous month",
     "nextMonth": "Next month",
     "closeCalendar": "Close calendar",
-    "weekdayHeaders": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    "weekdayHeaders": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
     "monthYear": "{month} {year}",
     "monthNames": [
       "January",
@@ -181,5 +181,10 @@
     "spanish": "Spanish",
     "french": "French",
     "german": "German"
+  },
+  "weekStartOptions": {
+    "label": "Week start",
+    "sunday": "Sun start",
+    "monday": "Mon start"
   }
 }

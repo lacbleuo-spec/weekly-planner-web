@@ -109,7 +109,7 @@
     "previousMonth": "Mes anterior",
     "nextMonth": "Mes siguiente",
     "closeCalendar": "Cerrar calendario",
-    "weekdayHeaders": ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"],
+    "weekdayHeaders": ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"],
     "monthYear": "{month} de {year}",
     "monthNames": [
       "Enero",
@@ -181,5 +181,10 @@
     "spanish": "Español",
     "french": "Francés",
     "german": "Alemán"
+  },
+  "weekStartOptions": {
+    "label": "Inicio de semana",
+    "sunday": "Dom. inicio",
+    "monday": "Lun. inicio"
   }
 }

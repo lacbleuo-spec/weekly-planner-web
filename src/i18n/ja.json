@@ -109,7 +109,7 @@
     "previousMonth": "前の月",
     "nextMonth": "次の月",
     "closeCalendar": "カレンダーを閉じる",
-    "weekdayHeaders": ["月", "火", "水", "木", "金", "土", "日"],
+    "weekdayHeaders": ["日", "月", "火", "水", "木", "金", "土"],
     "monthYear": "{year}年{month}",
     "monthNames": [
       "1月",
@@ -181,5 +181,10 @@
     "spanish": "スペイン語",
     "french": "フランス語",
     "german": "ドイツ語"
+  },
+  "weekStartOptions": {
+    "label": "週の開始",
+    "sunday": "日曜始まり",
+    "monday": "月曜始まり"
   }
 }
