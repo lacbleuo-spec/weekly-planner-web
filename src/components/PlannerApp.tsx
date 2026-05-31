@@ -62,6 +62,11 @@ import { AiPlannerChat } from '@/components/AiPlannerChat';
 import { LanguageSelect } from '@/components/LanguageSelect';
 import { dictionaries } from '@/i18n/dictionaries';
 
+import {
+  WeekStartSelect,
+  type WeekStartType,
+} from '@/components/WeekStartSelect';
+
 const REORDER_THRESHOLD = 42;
 const LOCAL_STORAGE_KEY = 'weekly-planner-local-data-v1';
 let dict = dictionaries.en;
@@ -346,6 +351,20 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
   const [showAIAnalysisNotice, setShowAIAnalysisNotice] = useState(false);
   const [showResetWeekModal, setShowResetWeekModal] = useState(false);
 
+  const [weekDisplayStart, setWeekDisplayStart] =
+    useState<WeekStartType>('sunday');
+
+  useEffect(() => {
+    const weekStart = document.cookie
+      .split('; ')
+      .find((row) => row.startsWith('weekboard-week-start='))
+      ?.split('=')[1];
+
+    if (weekStart === 'sunday' || weekStart === 'monday') {
+      setWeekDisplayStart(weekStart);
+    }
+  }, []);
+
   useEffect(() => {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
 
@@ -432,6 +451,17 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     [selectedWeekStartDate],
   );
 
+  const visibleWeekDates = useMemo(() => {
+    if (weekDisplayStart === 'sunday') return weekDates;
+
+    return Array.from({ length: 7 }, (_, i) =>
+      addingDays(selectedWeekStartDate, i + 1),
+    );
+  }, [weekDates, selectedWeekStartDate, weekDisplayStart]);
+
+  const visibleWeekStartDate = visibleWeekDates[0];
+  const visibleWeekEndDate = visibleWeekDates[visibleWeekDates.length - 1];
+
   const currentPlan = useMemo(() => {
     const selectedKey = weekKey(selectedWeekStartDate);
 
@@ -450,9 +480,21 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     );
   }, [currentPlan]);
 
+  const allVisibleDailyGoals = useMemo(() => {
+    return weeklyPlans.flatMap((plan) =>
+      plan.dailyGoals.filter((goal) => !goal.deletedAt),
+    );
+  }, [weeklyPlans]);
+
   const allGoals = useMemo(() => {
-    return currentPlan?.dailyGoals.filter((goal) => !goal.deletedAt) ?? [];
-  }, [currentPlan]);
+    return visibleWeekDates.flatMap((date) =>
+      sortGoalsByLabelAndOrder(
+        allVisibleDailyGoals.filter((goal) =>
+          isSameDay(goal.date.toDate(), date),
+        ),
+      ),
+    );
+  }, [visibleWeekDates, allVisibleDailyGoals]);
 
   const overallProgressStats = useMemo(
     () => progressStatsForGoals(allGoals),
@@ -660,7 +702,10 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
   }
 
   function moveToWeekContaining(date: Date) {
-    const next = startOfWeek(date);
+    const next =
+      weekDisplayStart === 'monday'
+        ? addingDays(date, -((date.getDay() + 6) % 7) - 1)
+        : startOfWeek(date);
 
     setSelectedWeekStartDate(next);
     syncExpandedDays(next);
@@ -870,10 +915,11 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
 
   function goalsForDate(date: Date) {
     return sortGoalsByLabelAndOrder(
-      allGoals.filter((goal) => isSameDay(goal.date.toDate(), date)),
+      allVisibleDailyGoals.filter((goal) =>
+        isSameDay(goal.date.toDate(), date),
+      ),
     );
   }
-
   function copyWeeklyGoalToDailyGoal(goal: FirebaseWeeklyGoal, dates: Date[]) {
     const plan = currentPlan ?? makeCurrentWeekPlan();
     const createdAt = now();
@@ -1217,7 +1263,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
   return (
     <main data-planner-theme={theme} className='min-h-screen transition-colors'>
       <PlannerResponsiveLayout
-        weekDates={weekDates}
+        weekDates={visibleWeekDates}
         globalSidebar={
           <>
             <div className='flex items-center justify-between'>
@@ -1225,6 +1271,13 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
 
               <div className='flex items-center gap-2'>
                 <LanguageSelect locale={locale} />
+
+                <WeekStartSelect
+                  locale={locale}
+                  value={weekDisplayStart}
+                  onChange={setWeekDisplayStart}
+                />
+
                 <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
               </div>
             </div>
@@ -1291,9 +1344,10 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
         weekSidebar={
           <>
             <WeekProgressCard
-              selectedWeekStartDate={selectedWeekStartDate}
-              selectedWeekEndDate={selectedWeekEndDate}
-              weekDates={weekDates}
+              selectedWeekStartDate={visibleWeekStartDate}
+              selectedWeekEndDate={visibleWeekEndDate}
+              weekDates={visibleWeekDates}
+              weekDisplayStart={weekDisplayStart}
               overallProgressStats={overallProgressStats}
               deletableProgressStats={deletableProgressStats}
               nonDeletableProgressStats={nonDeletableProgressStats}
@@ -1322,12 +1376,12 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
                     title={goal.title}
                     label={goal.label}
                     showCopy
-                    weekDates={weekDates}
+                    weekDates={visibleWeekDates}
                     onCopyToDays={(dates) =>
                       copyWeeklyGoalToDailyGoal(goal, dates)
                     }
                     onCopyToAllDays={() =>
-                      copyWeeklyGoalToDailyGoal(goal, weekDates)
+                      copyWeeklyGoalToDailyGoal(goal, visibleWeekDates)
                     }
                     onCopyToNextWeek={() => copyWeeklyGoalToNextWeek(goal)}
                     onMove={(direction) => moveWeeklyGoal(goal.id, direction)}
@@ -1717,6 +1771,7 @@ function WeekProgressCard({
   selectedWeekStartDate,
   selectedWeekEndDate,
   weekDates,
+  weekDisplayStart,
   overallProgressStats,
   deletableProgressStats,
   nonDeletableProgressStats,
@@ -1730,6 +1785,7 @@ function WeekProgressCard({
   selectedWeekStartDate: Date;
   selectedWeekEndDate: Date;
   weekDates: Date[];
+  weekDisplayStart: WeekStartType;
   overallProgressStats: GoalProgressStats;
   deletableProgressStats: GoalProgressStats;
   nonDeletableProgressStats: GoalProgressStats;
@@ -1784,6 +1840,7 @@ function WeekProgressCard({
           {showDatePicker && (
             <CalendarPopover
               selectedDate={selectedWeekStartDate}
+              weekDisplayStart={weekDisplayStart}
               onPickDate={onPickDate}
               onClose={onToggleDatePicker}
             />
@@ -1866,10 +1923,12 @@ function WeekProgressCard({
 
 function CalendarPopover({
   selectedDate,
+  weekDisplayStart,
   onPickDate,
   onClose,
 }: {
   selectedDate: Date;
+  weekDisplayStart: WeekStartType;
   onPickDate: (date: Date) => void;
   onClose: () => void;
 }) {
@@ -1883,8 +1942,20 @@ function CalendarPopover({
     1,
   );
 
-  const startOffset = monthStart.getDay();
+  const startOffset =
+    weekDisplayStart === 'monday'
+      ? (monthStart.getDay() + 6) % 7
+      : monthStart.getDay();
+
   const calendarStart = addingDays(monthStart, -startOffset);
+
+  const weekdayHeaders =
+    weekDisplayStart === 'monday'
+      ? [
+          ...dict.calendar.weekdayHeaders.slice(1),
+          dict.calendar.weekdayHeaders[0],
+        ]
+      : dict.calendar.weekdayHeaders;
 
   const dates = Array.from({ length: 42 }, (_, index) =>
     addingDays(calendarStart, index),
@@ -1938,7 +2009,7 @@ function CalendarPopover({
         </div>
 
         <div className='grid grid-cols-7 pb-1 text-center'>
-          {dict.calendar.weekdayHeaders.map((day, index) => (
+          {weekdayHeaders.map((day, index) => (
             <p
               key={`${day}-${index}`}
               className='py-1 text-[12px] font-semibold text-gray-400'
