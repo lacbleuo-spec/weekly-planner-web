@@ -38,6 +38,7 @@ import {
   endOfWeek,
   isSameDay,
   startOfWeek,
+  weekKey,
 } from '@/lib/date';
 import {
   deleteCloudUserData,
@@ -371,7 +372,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
   useEffect(() => {
     if (!hasLoadedLocalData) return;
     if (auth.isLoading) return;
-    if (!auth.user) return;
+    if (auth.user) return;
 
     localStorage.setItem(
       LOCAL_STORAGE_KEY,
@@ -398,6 +399,8 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
       localStorage.removeItem(LOCAL_STORAGE_KEY);
       return;
     }
+
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
 
     queueMicrotask(() => {
       setSyncError(null);
@@ -430,11 +433,13 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
   );
 
   const currentPlan = useMemo(() => {
+    const selectedKey = weekKey(selectedWeekStartDate);
+
     return (
       weeklyPlans.find(
         (plan) =>
           !plan.deletedAt &&
-          isSameDay(plan.weekStartDate.toDate(), selectedWeekStartDate),
+          weekKey(plan.weekStartDate.toDate()) === selectedKey,
       ) ?? null
     );
   }, [weeklyPlans, selectedWeekStartDate]);
@@ -904,7 +909,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
       weeklyPlans.find(
         (plan) =>
           !plan.deletedAt &&
-          isSameDay(plan.weekStartDate.toDate(), nextWeekStartDate),
+          weekKey(plan.weekStartDate.toDate()) === weekKey(nextWeekStartDate),
       ) ?? makePlanForWeek(nextWeekStartDate);
 
     const visibleNextWeekGoals = nextWeekPlan.weeklyGoals.filter(
@@ -3031,6 +3036,8 @@ function TimeReminderModal({
               <option value='10m'>10 {dict.planner.minutesBefore}</option>
               <option value='15m'>15 {dict.planner.minutesBefore}</option>
               <option value='30m'>30 {dict.planner.minutesBefore}</option>
+              <option value='1h'>1 {dict.planner.hourBefore}</option>
+              <option value='1d'>1 {dict.planner.dayBefore}</option>
               <option value='1h'>{dict.planner.hourBefore}</option>
               <option value='1d'>{dict.planner.dayBefore}</option>
             </select>
