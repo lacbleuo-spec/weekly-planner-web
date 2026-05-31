@@ -89,6 +89,15 @@ function somedayGoalDoc(userId: string, goalId: string) {
   return doc(db, 'users', userId, 'somedayGoals', goalId);
 }
 
+function dateFromDayKey(key: string): Date {
+  const [year, month, day] = key.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function canonicalWeekKey(key: string): string {
+  return weekKey(dateFromDayKey(key));
+}
+
 function makePlanMetaFromDate(date: Date): FirebaseWeeklyPlanMeta {
   const weekStartDate = startOfWeek(date);
   const weekEndDate = endOfWeek(date);
@@ -128,30 +137,44 @@ function assemblePlans(
   const metaMap = new Map<string, FirebaseWeeklyPlanMeta>();
 
   for (const meta of metas) {
-    metaMap.set(weekKey(meta.weekStartDate.toDate()), meta);
+    const key = weekKey(meta.weekStartDate.toDate());
+
+    metaMap.set(key, {
+      ...meta,
+      id: key,
+      weekStartDate: Timestamp.fromDate(
+        startOfWeek(meta.weekStartDate.toDate()),
+      ),
+      weekEndDate: Timestamp.fromDate(endOfWeek(meta.weekStartDate.toDate())),
+    });
   }
 
   for (const goal of weeklyGoals) {
-    if (!metaMap.has(goal.weekKey)) {
-      metaMap.set(goal.weekKey, makePlanMetaFromDate(goal.createdAt.toDate()));
+    const key = canonicalWeekKey(goal.weekKey);
+
+    if (!metaMap.has(key)) {
+      metaMap.set(key, makePlanMetaFromDate(dateFromDayKey(goal.weekKey)));
     }
   }
 
   for (const goal of dailyGoals) {
-    if (!metaMap.has(goal.weekKey)) {
-      metaMap.set(goal.weekKey, makePlanMetaFromDate(goal.date.toDate()));
+    const key = canonicalWeekKey(goal.weekKey);
+
+    if (!metaMap.has(key)) {
+      metaMap.set(key, makePlanMetaFromDate(goal.date.toDate()));
     }
   }
 
   return Array.from(metaMap.entries())
     .map(([key, meta]) => ({
       ...meta,
+      id: key,
       weeklyGoals: weeklyGoals
-        .filter((goal) => goal.weekKey === key)
+        .filter((goal) => canonicalWeekKey(goal.weekKey) === key)
         .map(removeWeekKeyFromWeeklyGoal)
         .sort((a, b) => a.order - b.order),
       dailyGoals: dailyGoals
-        .filter((goal) => goal.weekKey === key)
+        .filter((goal) => canonicalWeekKey(goal.weekKey) === key)
         .map(removeWeekKeyFromDailyGoal)
         .sort((a, b) => {
           const dateDiff = a.date.toMillis() - b.date.toMillis();
@@ -265,11 +288,13 @@ export async function saveWeeklyPlanMeta(
   plan: FirebaseWeeklyPlan,
 ) {
   const key = weekKey(plan.weekStartDate.toDate());
+  const weekStartDate = startOfWeek(plan.weekStartDate.toDate());
+  const weekEndDate = endOfWeek(plan.weekStartDate.toDate());
 
   const meta: FirebaseWeeklyPlanMeta = {
     id: key,
-    weekStartDate: plan.weekStartDate,
-    weekEndDate: plan.weekEndDate,
+    weekStartDate: Timestamp.fromDate(weekStartDate),
+    weekEndDate: Timestamp.fromDate(weekEndDate),
     createdAt: plan.createdAt,
     updatedAt: plan.updatedAt ?? Timestamp.now(),
     deletedAt: plan.deletedAt ?? null,
@@ -305,14 +330,16 @@ export async function saveWeeklyGoals(
   goals: FirebaseWeeklyGoal[],
 ) {
   const key = weekKey(plan.weekStartDate.toDate());
+  const weekStartDate = startOfWeek(plan.weekStartDate.toDate());
+  const weekEndDate = endOfWeek(plan.weekStartDate.toDate());
   const batch = writeBatch(db);
 
   batch.set(
     weeklyPlanDoc(userId, key),
     cleanUndefined({
       id: key,
-      weekStartDate: plan.weekStartDate,
-      weekEndDate: plan.weekEndDate,
+      weekStartDate: Timestamp.fromDate(weekStartDate),
+      weekEndDate: Timestamp.fromDate(weekEndDate),
       createdAt: plan.createdAt,
       updatedAt: plan.updatedAt ?? Timestamp.now(),
       deletedAt: plan.deletedAt ?? null,
@@ -359,14 +386,16 @@ export async function saveDailyGoals(
   goals: FirebaseDailyGoal[],
 ) {
   const key = weekKey(plan.weekStartDate.toDate());
+  const weekStartDate = startOfWeek(plan.weekStartDate.toDate());
+  const weekEndDate = endOfWeek(plan.weekStartDate.toDate());
   const batch = writeBatch(db);
 
   batch.set(
     weeklyPlanDoc(userId, key),
     cleanUndefined({
       id: key,
-      weekStartDate: plan.weekStartDate,
-      weekEndDate: plan.weekEndDate,
+      weekStartDate: Timestamp.fromDate(weekStartDate),
+      weekEndDate: Timestamp.fromDate(weekEndDate),
       createdAt: plan.createdAt,
       updatedAt: plan.updatedAt ?? Timestamp.now(),
       deletedAt: plan.deletedAt ?? null,
