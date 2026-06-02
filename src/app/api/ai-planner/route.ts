@@ -17,6 +17,16 @@ type AiLocaleConfig = {
   };
 };
 
+const SAFE_BLOCK_MESSAGE: Record<Locale, string> = {
+  en: 'Sorry, I can only suggest weekly goals suitable for all ages.',
+  ko: '죄송하지만 전 연령에 적합한 주간 목표만 추천할 수 있어요.',
+  ja: '申し訳ありませんが、全年齢向けの週間目標のみ提案できます。',
+  zh: '抱歉，我只能建议适合全年龄段的每周目标。',
+  es: 'Lo siento, solo puedo sugerir objetivos semanales adecuados para todas las edades.',
+  fr: 'Désolé, je ne peux proposer que des objectifs hebdomadaires adaptés à tous les âges.',
+  de: 'Entschuldigung, ich kann nur Wochenziele vorschlagen, die für alle Altersgruppen geeignet sind.',
+};
+
 const AI_LOCALE: Record<Locale, AiLocaleConfig> = {
   en: {
     language: 'English',
@@ -77,8 +87,18 @@ function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && value in AI_LOCALE;
 }
 
+async function isUnsafeText(text: string) {
+  const moderation = await openai.moderations.create({
+    model: 'omni-moderation-latest',
+    input: text,
+  });
+
+  return moderation.results.some((result) => result.flagged);
+}
+
 function getAiPrompt(locale: Locale) {
   const t = AI_LOCALE[locale];
+  const safeMessage = SAFE_BLOCK_MESSAGE[locale];
 
   return `
 You are Weekboard AI.
@@ -143,6 +163,15 @@ ${t.sections.thisWeek}
 
 ${t.sections.closing}
 
+Safety rules:
+- This app must be safe for students and appropriate for a 4+ age rating.
+- Never generate adult, sexual, erotic, dating, romantic intimacy-related, violent, hateful, harassing, illegal, dangerous, gambling, drug, alcohol, smoking, weapon, self-harm, suicide, or eating disorder-related goals.
+- Never provide medical, legal, financial, or psychological advice.
+- If the user's request is unsafe or inappropriate for minors, do not provide goal candidates.
+- If the user's request is unsafe or inappropriate for minors, respond exactly with:
+"${safeMessage}"
+- Do not mention policy, guidelines, age rating, App Review, or safety rules.
+
 Rules:
 - Do not include "Goal" section.
 - Do not include "Why this matters" section.
@@ -189,6 +218,15 @@ export async function POST(request: Request) {
     }
 
     const safeLocale: Locale = isLocale(locale) ? locale : 'en';
+    const safeMessage = SAFE_BLOCK_MESSAGE[safeLocale];
+
+    const isInputUnsafe = await isUnsafeText(message);
+
+    if (isInputUnsafe) {
+      return NextResponse.json({
+        reply: safeMessage,
+      });
+    }
 
     const response = await openai.responses.create({
       model: 'gpt-4.1-mini',
@@ -204,8 +242,18 @@ export async function POST(request: Request) {
       ],
     });
 
+    const reply = response.output_text || safeMessage;
+
+    const isOutputUnsafe = await isUnsafeText(reply);
+
+    if (isOutputUnsafe) {
+      return NextResponse.json({
+        reply: safeMessage,
+      });
+    }
+
     return NextResponse.json({
-      reply: response.output_text,
+      reply,
     });
   } catch (error) {
     console.error(error);
@@ -216,5 +264,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
-//

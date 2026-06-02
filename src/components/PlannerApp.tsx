@@ -581,6 +581,11 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     setSomedayGoals(updatedGoals);
   }
 
+  function markSynced() {
+    setSyncError(null);
+    setLastSyncedAt(new Date());
+  }
+
   async function syncWeeklyGoalChange(
     updatedPlan: FirebaseWeeklyPlan,
     goal: FirebaseWeeklyGoal,
@@ -591,7 +596,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
 
     try {
       await saveWeeklyGoal(auth.user.uid, updatedPlan, goal);
-      setSyncError(null);
+      markSynced();
     } catch (error) {
       setSyncError(
         error instanceof Error ? error.message : dict.errors.syncWeeklyGoal,
@@ -609,7 +614,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
 
     try {
       await saveWeeklyGoals(auth.user.uid, updatedPlan, goals);
-      setSyncError(null);
+      markSynced();
     } catch (error) {
       setSyncError(
         error instanceof Error ? error.message : dict.errors.syncWeeklyGoals,
@@ -627,7 +632,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
 
     try {
       await saveDailyGoal(auth.user.uid, updatedPlan, goal);
-      setSyncError(null);
+      markSynced();
     } catch (error) {
       setSyncError(
         error instanceof Error ? error.message : dict.errors.syncDailyGoal,
@@ -645,7 +650,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
 
     try {
       await saveDailyGoals(auth.user.uid, updatedPlan, goals);
-      setSyncError(null);
+      markSynced();
     } catch (error) {
       setSyncError(
         error instanceof Error ? error.message : dict.errors.syncDailyGoals,
@@ -663,7 +668,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
 
     try {
       await saveSomedayGoal(auth.user.uid, goal);
-      setSyncError(null);
+      markSynced();
     } catch (error) {
       setSyncError(
         error instanceof Error ? error.message : dict.errors.syncSomedayGoal,
@@ -681,7 +686,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
 
     try {
       await saveSomedayGoals(auth.user.uid, changedGoals);
-      setSyncError(null);
+      markSynced();
     } catch (error) {
       setSyncError(
         error instanceof Error ? error.message : dict.errors.syncSomedayGoals,
@@ -1252,7 +1257,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
         saveDailyGoals(auth.user.uid, updatedPlan, deletedDailyGoals),
       ]);
 
-      setSyncError(null);
+      markSynced();
     } catch (error) {
       setSyncError(
         error instanceof Error ? error.message : dict.errors.resetWeek,
