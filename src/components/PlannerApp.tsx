@@ -1271,9 +1271,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
         weekDates={visibleWeekDates}
         globalSidebar={
           <>
-            <div className='flex items-center justify-between'>
-              <MobileAppCard />
-
+            <div className='flex items-center justify-end'>
               <div className='flex items-center gap-2'>
                 <LanguageSelect locale={locale} />
 
@@ -1284,6 +1282,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
                 />
 
                 <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+                <MobileAppCard />
               </div>
             </div>
 
@@ -2365,20 +2364,20 @@ type BeforeInstallPromptEvent = Event & {
 const IOS_APP_STORE_URL = 'https://apps.apple.com/app/id6775522975';
 
 function MobileAppCard() {
-  const isStandalone =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(display-mode: standalone)').matches;
-
   const isIOS =
     typeof navigator !== 'undefined' &&
     /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-  const canDownloadApp = isIOS && !isStandalone;
+  const isAndroid =
+    typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+
+  // iOS + Web 허용, Android만 차단
+  const canDownloadApp = isIOS || !isAndroid;
 
   function installApp() {
     if (!canDownloadApp) return;
 
-    window.location.href = IOS_APP_STORE_URL;
+    window.open(IOS_APP_STORE_URL, '_blank');
   }
 
   return (
@@ -2386,14 +2385,11 @@ function MobileAppCard() {
       type='button'
       onClick={installApp}
       disabled={!canDownloadApp}
-      className={`flex items-center gap-2 text-[17px] font-semibold ${
-        !canDownloadApp
-          ? 'cursor-not-allowed text-gray-400 opacity-50'
-          : 'text-black active:scale-[0.98]'
-      }`}
+      className='flex h-9 w-9 items-center justify-center rounded-full bg-white text-gray-500 transition active:scale-[0.98] active:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
+      aria-label={dict.mobile.installApp}
+      title={dict.mobile.installApp}
     >
-      <Smartphone size={19} strokeWidth={2.2} className='w-5' />
-      {dict.mobile.installApp}
+      <Smartphone size={17} />
     </button>
   );
 }
