@@ -362,6 +362,10 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
 
     if (weekStart === 'sunday' || weekStart === 'monday') {
       setWeekDisplayStart(weekStart);
+
+      const next = weekStartDateFor(new Date(), weekStart);
+      setSelectedWeekStartDate(next);
+      syncExpandedDays(next);
     }
   }, []);
 
@@ -694,6 +698,12 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     }
   }
 
+  function weekStartDateFor(date: Date, weekDisplayStart: WeekStartType) {
+    return weekDisplayStart === 'monday'
+      ? addingDays(date, -((date.getDay() + 6) % 7) - 1)
+      : startOfWeek(date);
+  }
+
   function syncExpandedDays(nextWeekStartDate: Date) {
     const dates = Array.from({ length: 7 }, (_, i) =>
       addingDays(nextWeekStartDate, i),
@@ -707,10 +717,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
   }
 
   function moveToWeekContaining(date: Date) {
-    const next =
-      weekDisplayStart === 'monday'
-        ? addingDays(date, -((date.getDay() + 6) % 7) - 1)
-        : startOfWeek(date);
+    const next = weekStartDateFor(date, weekDisplayStart);
 
     setSelectedWeekStartDate(next);
     syncExpandedDays(next);
