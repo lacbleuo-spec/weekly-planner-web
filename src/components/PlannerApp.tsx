@@ -69,6 +69,7 @@ import {
 
 const REORDER_THRESHOLD = 42;
 const LOCAL_STORAGE_KEY = 'weekly-planner-local-data-v1';
+const LIFE_LINE_LABEL = '__LIFE_LINE__';
 let dict = dictionaries.en;
 
 function formatText(template: string, values: Record<string, string | number>) {
@@ -337,10 +338,12 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
 
   const [newWeeklyGoalText, setNewWeeklyGoalText] = useState('');
   const [newSomedayGoalText, setNewSomedayGoalText] = useState('');
+  const [newLifeLineText, setNewLifeLineText] = useState('');
   const [newGoalTexts, setNewGoalTexts] = useState<Record<string, string>>({});
 
   const [goalToLock, setGoalToLock] = useState<FirebaseDailyGoal | null>(null);
 
+  const [isLifeLineExpanded, setIsLifeLineExpanded] = useState(true);
   const [isSomedayExpanded, setIsSomedayExpanded] = useState(false);
   const [isWeeklyExpanded, setIsWeeklyExpanded] = useState(true);
   const [expandedDayKeys, setExpandedDayKeys] = useState<Set<string>>(
@@ -521,9 +524,19 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     [allGoals],
   );
 
+  const lifeLineGoal = useMemo(() => {
+    return (
+      somedayGoals.find(
+        (goal) => !goal.deletedAt && goal.label === LIFE_LINE_LABEL,
+      ) ?? null
+    );
+  }, [somedayGoals]);
+
   const visibleSomedayGoals = useMemo(() => {
     return sortGoalsByLabelAndOrder(
-      somedayGoals.filter((goal) => !goal.deletedAt),
+      somedayGoals.filter(
+        (goal) => !goal.deletedAt && goal.label !== LIFE_LINE_LABEL,
+      ),
     );
   }, [somedayGoals]);
 
@@ -740,6 +753,36 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
 
     setNewSomedayGoalText('');
     syncSomedayGoalChange([...somedayGoals, goal], goal);
+  }
+
+  function addLifeLineGoal() {
+    const text = newLifeLineText.trim();
+    if (!text || lifeLineGoal) return;
+
+    const createdAt = now();
+    const goal: FirebaseSomedayGoal = {
+      id: makeId(),
+      title: text,
+      label: LIFE_LINE_LABEL,
+      order: 0,
+      createdAt,
+      updatedAt: createdAt,
+      deletedAt: null,
+    };
+
+    setNewLifeLineText('');
+    syncSomedayGoalChange([...somedayGoals, goal], goal);
+  }
+
+  function deleteLifeLineGoal() {
+    if (!lifeLineGoal) return;
+
+    const deletedGoal = { ...lifeLineGoal, deletedAt: now(), updatedAt: now() };
+    const nextGoals = somedayGoals.map((goal) =>
+      goal.id === lifeLineGoal.id ? deletedGoal : goal,
+    );
+
+    syncSomedayGoalChange(nextGoals, deletedGoal);
   }
 
   function deleteSomedayGoal(goalId: string) {
@@ -1319,6 +1362,33 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
                 </button>
               </div>
             </Card>
+
+            <ExpandableCard
+              title={dict.planner.lifeLine}
+              subtitle={`${lifeLineGoal ? 1 : 0} / 1`}
+              expanded={isLifeLineExpanded}
+              onToggle={() => setIsLifeLineExpanded((prev) => !prev)}
+            >
+              {!lifeLineGoal && (
+                <>
+                  <EmptyText>{dict.planner.addLifeLine}</EmptyText>
+
+                  <AddInput
+                    value={newLifeLineText}
+                    onChange={setNewLifeLineText}
+                    placeholder={dict.planner.addLifeLineInput}
+                    onSubmit={addLifeLineGoal}
+                  />
+                </>
+              )}
+
+              {lifeLineGoal && (
+                <SimpleGoalRow
+                  title={lifeLineGoal.title}
+                  onDelete={deleteLifeLineGoal}
+                />
+              )}
+            </ExpandableCard>
 
             <ExpandableCard
               title={dict.planner.somedayGoals}
@@ -2594,6 +2664,26 @@ function GoalLabelSelect({
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+function SimpleGoalRow({
+  title,
+  onDelete,
+}: {
+  title: string;
+  onDelete: () => void;
+}) {
+  return (
+    <div className='flex items-center gap-2 rounded-[14px] bg-white px-1 py-2.5'>
+      <p className='min-w-0 flex-1 text-[16px] font-normal text-black'>
+        {title}
+      </p>
+
+      <button onClick={onDelete} className='p-1 text-red-500'>
+        <Trash size={18} />
+      </button>
     </div>
   );
 }
