@@ -67,6 +67,11 @@ import {
   type WeekStartType,
 } from '@/components/WeekStartSelect';
 
+import {
+  WeekboardGuideButton,
+  WeekboardGuideModal,
+} from '@/components/WeekboardGuide';
+
 const REORDER_THRESHOLD = 42;
 const LOCAL_STORAGE_KEY = 'weekly-planner-local-data-v1';
 const LIFE_LINE_LABEL = '__LIFE_LINE__';
@@ -324,6 +329,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
   const auth = useAuth();
   const { theme, isDark, toggleTheme } = useTheme();
 
+  const [showGuideModal, setShowGuideModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
@@ -1331,6 +1337,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
                   onChange={setWeekDisplayStart}
                 />
 
+                <WeekboardGuideButton onClick={() => setShowGuideModal(true)} />
                 <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
                 <MobileAppCard />
               </div>
@@ -1794,6 +1801,13 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
           title={dict.planner.aiAnalysis}
           message={dict.planner.aiAnalysisComingSoon}
           onClose={() => setShowAIAnalysisNotice(false)}
+        />
+      )}
+
+      {showGuideModal && (
+        <WeekboardGuideModal
+          locale={locale}
+          onClose={() => setShowGuideModal(false)}
         />
       )}
 
