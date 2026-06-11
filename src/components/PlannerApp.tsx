@@ -2476,30 +2476,24 @@ type BeforeInstallPromptEvent = Event & {
 };
 
 const IOS_APP_STORE_URL = 'https://apps.apple.com/app/id6775522975';
+const ANDROID_PLAY_STORE_URL =
+  'https://play.google.com/store/apps/details?id=com.openstrap.weekboard&pcampaignid=web_share';
 
 function MobileAppCard() {
-  const isIOS =
-    typeof navigator !== 'undefined' &&
-    /iPhone|iPad|iPod/i.test(navigator.userAgent);
-
   const isAndroid =
     typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
 
-  // iOS + Web 허용, Android만 차단
-  const canDownloadApp = isIOS || !isAndroid;
+  const appDownloadUrl = isAndroid ? ANDROID_PLAY_STORE_URL : IOS_APP_STORE_URL;
 
   function installApp() {
-    if (!canDownloadApp) return;
-
-    window.open(IOS_APP_STORE_URL, '_blank');
+    window.open(appDownloadUrl, '_blank', 'noopener,noreferrer');
   }
 
   return (
     <button
       type='button'
       onClick={installApp}
-      disabled={!canDownloadApp}
-      className='flex h-9 w-9 items-center justify-center rounded-full bg-white text-gray-500 transition active:scale-[0.98] active:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
+      className='flex h-9 w-9 items-center justify-center rounded-full bg-white text-gray-500 transition active:scale-[0.98] active:bg-gray-100'
       aria-label={dict.mobile.installApp}
       title={dict.mobile.installApp}
     >
