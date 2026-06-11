@@ -1327,8 +1327,9 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
         weekDates={visibleWeekDates}
         globalSidebar={
           <>
-            <div className='flex items-center justify-end'>
-              <div className='flex items-center gap-2'>
+            <div className='space-y-2'>
+              {/* 웹 / 데스크톱: 언어 선택, 주 시작 선택을 위쪽에 배치 */}
+              <div className='hidden items-center justify-end gap-2 xl:flex'>
                 <LanguageSelect locale={locale} />
 
                 <WeekStartSelect
@@ -1336,10 +1337,32 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
                   value={weekDisplayStart}
                   onChange={setWeekDisplayStart}
                 />
+              </div>
 
+              {/* 웹 / 데스크톱: 사용 설명서, 다크모드, 앱 다운 버튼을 아래쪽에 배치 */}
+              <div className='hidden items-center justify-end gap-2 xl:flex'>
                 <WeekboardGuideButton onClick={() => setShowGuideModal(true)} />
                 <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
                 <MobileAppCard />
+              </div>
+
+              {/* 모바일 / 태블릿: 기존처럼 한 줄 유지 */}
+              <div className='flex items-center justify-end xl:hidden'>
+                <div className='flex items-center gap-2'>
+                  <LanguageSelect locale={locale} />
+
+                  <WeekStartSelect
+                    locale={locale}
+                    value={weekDisplayStart}
+                    onChange={setWeekDisplayStart}
+                  />
+
+                  <WeekboardGuideButton
+                    onClick={() => setShowGuideModal(true)}
+                  />
+                  <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+                  <MobileAppCard />
+                </div>
               </div>
             </div>
 

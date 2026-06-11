@@ -17,10 +17,10 @@ import {
 type GuideExampleVariant = 'top' | 'weekly' | 'daily';
 
 type GuideExample = {
-  title?: string;
   variant?: GuideExampleVariant;
   blockTitle?: string;
   blockSubtitle?: string;
+  blockDate?: string;
   inputPlaceholder?: string;
   lines: string[];
 };
@@ -29,6 +29,7 @@ type GuideSection = {
   title: string;
   paragraphs: string[];
   examples?: GuideExample[];
+  exampleAfterParagraphIndex?: number;
   steps?: string[];
 };
 
@@ -61,16 +62,11 @@ const weekboardGuideJson: Record<string, GuideContent> = {
         ],
         examples: [
           {
-            title: 'Beispiel',
             variant: 'top',
             blockTitle: 'Übergeordnete Ziele',
-            blockSubtitle: '3 Ziele',
+            blockSubtitle: '1 Ziel',
             inputPlaceholder: 'Übergeordnetes Ziel hinzufügen',
-            lines: [
-              'A Gesundheitsmanagement',
-              'B Finanzielle Stabilität',
-              'C Persönliche Entwicklung',
-            ],
+            lines: ['A Gesundheitsmanagement'],
           },
         ],
       },
@@ -85,7 +81,6 @@ const weekboardGuideJson: Record<string, GuideContent> = {
         ],
         examples: [
           {
-            title: 'Beispiel',
             variant: 'weekly',
             blockTitle: 'Wochenziele',
             blockSubtitle: '3 Ziele',
@@ -104,12 +99,20 @@ const weekboardGuideJson: Record<string, GuideContent> = {
           'Tagesziele sind der Bereich, in dem du die Ziele verwaltest, die du heute tatsächlich umsetzen willst.',
           'Du kannst Ziele aus den Wochenzielen kopieren oder Ziele hinzufügen, die nur für heute nötig sind.',
           'Bei Tageszielen kannst du abhaken, ob du jedes Ziel ausgeführt hast. Prüfe deinen heutigen Umsetzungsstatus, während du erledigte Ziele markierst.',
+          '1) Tagesziele haben eine Fixieren-Funktion.',
+          'Wenn du ein Ziel fixierst, kannst du dieses Ziel nicht verwenden.',
+          'Diese Funktion hilft dir, Ziele bis zum Ende umzusetzen, die du leicht aufschieben oder löschen würdest.',
+          'Nutze die Fixieren-Funktion zum Beispiel für Ziele wie Sport, Lernen oder Lesen, die du zwar machen willst, aber oft aufschiebst.',
+          '2) Tagesziele haben auch eine Zeit-Erinnerungsfunktion.',
+          'Wenn du eine Erinnerungszeit für ein Ziel festlegst, kannst du zur entsprechenden Zeit eine Benachrichtigung erhalten, damit du das Ziel ausführst.',
+          'Wenn ein Ziel eine feste Ausführungszeit hat, ist es sinnvoll, eine Erinnerung einzustellen.',
         ],
+        exampleAfterParagraphIndex: 3,
         examples: [
           {
-            title: 'Beispiel',
             variant: 'daily',
-            blockTitle: 'Heute',
+            blockTitle: 'Montag',
+            blockDate: '1. Januar',
             blockSubtitle: '0/5',
             inputPlaceholder: 'Ziel für heute hinzufügen',
             lines: [
@@ -120,23 +123,6 @@ const weekboardGuideJson: Record<string, GuideContent> = {
               'Z Paket verschicken',
             ],
           },
-        ],
-      },
-      {
-        title: '1)',
-        paragraphs: [
-          'Tagesziele haben eine Fixieren-Funktion.',
-          'Wenn du ein Ziel fixierst, kannst du dieses Ziel nicht verwenden.',
-          'Diese Funktion hilft dir, Ziele bis zum Ende umzusetzen, die du leicht aufschieben oder löschen würdest.',
-          'Nutze die Fixieren-Funktion zum Beispiel für Ziele wie Sport, Lernen oder Lesen, die du zwar machen willst, aber oft aufschiebst.',
-        ],
-      },
-      {
-        title: '2)',
-        paragraphs: [
-          'Tagesziele haben auch eine Zeit-Erinnerungsfunktion.',
-          'Wenn du eine Erinnerungszeit für ein Ziel festlegst, kannst du zur entsprechenden Zeit eine Benachrichtigung erhalten, damit du das Ziel ausführst.',
-          'Wenn ein Ziel eine feste Ausführungszeit hat, ist es sinnvoll, eine Erinnerung einzustellen.',
         ],
       },
       {
@@ -185,16 +171,11 @@ const weekboardGuideJson: Record<string, GuideContent> = {
         ],
         examples: [
           {
-            title: 'Example',
             variant: 'top',
             blockTitle: 'Top-Level Goals',
-            blockSubtitle: '3 goals',
+            blockSubtitle: '1 goal',
             inputPlaceholder: 'Add top-level goal',
-            lines: [
-              'A Health management',
-              'B Financial stability',
-              'C Self-development',
-            ],
+            lines: ['A Health management'],
           },
         ],
       },
@@ -209,7 +190,6 @@ const weekboardGuideJson: Record<string, GuideContent> = {
         ],
         examples: [
           {
-            title: 'Example',
             variant: 'weekly',
             blockTitle: 'Weekly Goals',
             blockSubtitle: '3 goals',
@@ -228,12 +208,20 @@ const weekboardGuideJson: Record<string, GuideContent> = {
           'Daily Goals are the space where you manage the goals you will actually execute today.',
           'You can bring in goals copied from Weekly Goals or add goals that are only needed today.',
           'In Daily Goals, you can check whether each goal has been completed. Track today’s execution status by checking off completed goals.',
+          '1) Daily Goals include a lock feature.',
+          'When you lock a goal, that goal cannot be used.',
+          'This feature helps you follow through on goals you might otherwise postpone or delete.',
+          'For example, try using the lock feature for goals like exercise, studying, or reading—things you want to do but often put off.',
+          '2) Daily Goals also include a time reminder feature.',
+          'If you set a reminder time for a goal, you can receive a notification at that time so you can execute it.',
+          'If a goal has a set execution time, it is a good idea to set a reminder.',
         ],
+        exampleAfterParagraphIndex: 3,
         examples: [
           {
-            title: 'Example',
             variant: 'daily',
-            blockTitle: 'Today',
+            blockTitle: 'Monday',
+            blockDate: 'January 1',
             blockSubtitle: '0/5',
             inputPlaceholder: 'Add today’s goal',
             lines: [
@@ -244,23 +232,6 @@ const weekboardGuideJson: Record<string, GuideContent> = {
               'Z Send package',
             ],
           },
-        ],
-      },
-      {
-        title: '1)',
-        paragraphs: [
-          'Daily Goals include a lock feature.',
-          'When you lock a goal, that goal cannot be used.',
-          'This feature helps you follow through on goals you might otherwise postpone or delete.',
-          'For example, try using the lock feature for goals like exercise, studying, or reading—things you want to do but often put off.',
-        ],
-      },
-      {
-        title: '2)',
-        paragraphs: [
-          'Daily Goals also include a time reminder feature.',
-          'If you set a reminder time for a goal, you can receive a notification at that time so you can execute it.',
-          'If a goal has a set execution time, it is a good idea to set a reminder.',
         ],
       },
       {
@@ -309,16 +280,11 @@ const weekboardGuideJson: Record<string, GuideContent> = {
         ],
         examples: [
           {
-            title: 'Ejemplo',
             variant: 'top',
             blockTitle: 'Objetivos de nivel superior',
-            blockSubtitle: '3 metas',
+            blockSubtitle: '1 meta',
             inputPlaceholder: 'Añadir objetivo de nivel superior',
-            lines: [
-              'A Gestión de salud',
-              'B Estabilidad financiera',
-              'C Desarrollo personal',
-            ],
+            lines: ['A Gestión de salud'],
           },
         ],
       },
@@ -333,7 +299,6 @@ const weekboardGuideJson: Record<string, GuideContent> = {
         ],
         examples: [
           {
-            title: 'Ejemplo',
             variant: 'weekly',
             blockTitle: 'Metas semanales',
             blockSubtitle: '3 metas',
@@ -352,12 +317,20 @@ const weekboardGuideJson: Record<string, GuideContent> = {
           'Las metas diarias son el espacio donde gestionas las metas que realmente ejecutarás hoy.',
           'Puedes traer metas copiadas desde las metas semanales o añadir metas que solo necesitas hoy.',
           'En las metas diarias puedes marcar si completaste cada meta. Revisa tu estado de ejecución de hoy marcando las metas terminadas.',
+          '1) Las metas diarias incluyen una función de bloqueo.',
+          'Cuando bloqueas una meta, esa meta no se puede usar.',
+          'Esta función te ayuda a completar metas que podrías aplazar o borrar fácilmente.',
+          'Por ejemplo, usa la función de bloqueo para metas como hacer ejercicio, estudiar o leer: cosas que quieres hacer pero sueles posponer.',
+          '2) Las metas diarias también incluyen una función de recordatorio por hora.',
+          'Si configuras una hora de recordatorio para una meta, recibirás una notificación a esa hora para poder ejecutarla.',
+          'Si una meta tiene una hora de ejecución definida, es recomendable configurar un recordatorio.',
         ],
+        exampleAfterParagraphIndex: 3,
         examples: [
           {
-            title: 'Ejemplo',
             variant: 'daily',
-            blockTitle: 'Hoy',
+            blockTitle: 'Lunes',
+            blockDate: '1 de enero',
             blockSubtitle: '0/5',
             inputPlaceholder: 'Agregar meta para hoy',
             lines: [
@@ -368,23 +341,6 @@ const weekboardGuideJson: Record<string, GuideContent> = {
               'Z Enviar paquete',
             ],
           },
-        ],
-      },
-      {
-        title: '1)',
-        paragraphs: [
-          'Las metas diarias incluyen una función de bloqueo.',
-          'Cuando bloqueas una meta, esa meta no se puede usar.',
-          'Esta función te ayuda a completar metas que podrías aplazar o borrar fácilmente.',
-          'Por ejemplo, usa la función de bloqueo para metas como hacer ejercicio, estudiar o leer: cosas que quieres hacer pero sueles posponer.',
-        ],
-      },
-      {
-        title: '2)',
-        paragraphs: [
-          'Las metas diarias también incluyen una función de recordatorio por hora.',
-          'Si configuras una hora de recordatorio para una meta, recibirás una notificación a esa hora para poder ejecutarla.',
-          'Si una meta tiene una hora de ejecución definida, es recomendable configurar un recordatorio.',
         ],
       },
       {
@@ -433,16 +389,11 @@ const weekboardGuideJson: Record<string, GuideContent> = {
         ],
         examples: [
           {
-            title: 'Exemple',
             variant: 'top',
             blockTitle: 'Objectifs de niveau supérieur',
-            blockSubtitle: '3 objectifs',
+            blockSubtitle: '1 objectif',
             inputPlaceholder: 'Ajouter un objectif de niveau supérieur',
-            lines: [
-              'A Gestion de la santé',
-              'B Stabilité financière',
-              'C Développement personnel',
-            ],
+            lines: ['A Gestion de la santé'],
           },
         ],
       },
@@ -457,7 +408,6 @@ const weekboardGuideJson: Record<string, GuideContent> = {
         ],
         examples: [
           {
-            title: 'Exemple',
             variant: 'weekly',
             blockTitle: 'Objectifs hebdomadaires',
             blockSubtitle: '3 objectifs',
@@ -476,12 +426,20 @@ const weekboardGuideJson: Record<string, GuideContent> = {
           'Les objectifs quotidiens sont l’espace où gérer les objectifs que vous allez réellement exécuter aujourd’hui.',
           'Vous pouvez importer des objectifs copiés depuis les objectifs hebdomadaires ou ajouter des objectifs nécessaires uniquement aujourd’hui.',
           'Dans les objectifs quotidiens, vous pouvez cocher chaque objectif exécuté. Suivez l’état d’exécution de votre journée en cochant les objectifs terminés.',
+          '1) Les objectifs quotidiens disposent d’une fonction de verrouillage.',
+          'Lorsque vous verrouillez un objectif, cet objectif ne peut pas être utilisé.',
+          'Cette fonction vous aide à aller jusqu’au bout des objectifs que vous pourriez facilement repousser ou supprimer.',
+          'Par exemple, utilisez la fonction de verrouillage pour le sport, les études ou la lecture — des objectifs que vous voulez faire mais que vous reportez souvent.',
+          '2) Les objectifs quotidiens disposent aussi d’une fonction de rappel horaire.',
+          'Si vous définissez une heure de rappel pour un objectif, vous pouvez recevoir une notification à cette heure afin de l’exécuter.',
+          'Si un objectif doit être réalisé à une heure précise, il est conseillé de définir un rappel.',
         ],
+        exampleAfterParagraphIndex: 3,
         examples: [
           {
-            title: 'Exemple',
             variant: 'daily',
-            blockTitle: 'Aujourd’hui',
+            blockTitle: 'Lundi',
+            blockDate: '1 janvier',
             blockSubtitle: '0/5',
             inputPlaceholder: 'Ajouter un objectif pour aujourd’hui',
             lines: [
@@ -492,23 +450,6 @@ const weekboardGuideJson: Record<string, GuideContent> = {
               'Z Envoyer un colis',
             ],
           },
-        ],
-      },
-      {
-        title: '1)',
-        paragraphs: [
-          'Les objectifs quotidiens disposent d’une fonction de verrouillage.',
-          'Lorsque vous verrouillez un objectif, cet objectif ne peut pas être utilisé.',
-          'Cette fonction vous aide à aller jusqu’au bout des objectifs que vous pourriez facilement repousser ou supprimer.',
-          'Par exemple, utilisez la fonction de verrouillage pour le sport, les études ou la lecture — des objectifs que vous voulez faire mais que vous reportez souvent.',
-        ],
-      },
-      {
-        title: '2)',
-        paragraphs: [
-          'Les objectifs quotidiens disposent aussi d’une fonction de rappel horaire.',
-          'Si vous définissez une heure de rappel pour un objectif, vous pouvez recevoir une notification à cette heure afin de l’exécuter.',
-          'Si un objectif doit être réalisé à une heure précise, il est conseillé de définir un rappel.',
         ],
       },
       {
@@ -557,12 +498,11 @@ const weekboardGuideJson: Record<string, GuideContent> = {
         ],
         examples: [
           {
-            title: '例',
             variant: 'top',
             blockTitle: '最上位目標',
-            blockSubtitle: '3 目標',
+            blockSubtitle: '1 目標',
             inputPlaceholder: '最上位目標を追加',
-            lines: ['A 健康管理', 'B 経済的安定', 'C 自己成長'],
+            lines: ['A 健康管理'],
           },
         ],
       },
@@ -577,7 +517,6 @@ const weekboardGuideJson: Record<string, GuideContent> = {
         ],
         examples: [
           {
-            title: '例',
             variant: 'weekly',
             blockTitle: '週間目標',
             blockSubtitle: '3 目標',
@@ -596,12 +535,20 @@ const weekboardGuideJson: Record<string, GuideContent> = {
           '日次目標は、今日実際に実行する目標を管理する場所です。',
           '週間目標からコピーした目標を取り込むことも、今日だけ必要な目標を直接追加することもできます。',
           '日次目標では、各目標を実行したかどうかをチェックできます。完了した目標にチェックしながら、今日の実行状況を確認してみましょう。',
+          '1) 日次目標にはロック機能があります。',
+          '目標をロックすると、その目標は使用できません。',
+          'この機能は、つい先延ばしにしたり削除したくなる目標を、最後まで実行する助けになります。',
+          'たとえば運動、勉強、読書のように、やる気はあるけれどよく先延ばしにしてしまう目標には、ロック機能を使ってみてください。',
+          '2) 日次目標には時間リマインダー機能もあります。',
+          '目標にリマインダー時刻を設定すると、その時刻に目標を実行できるよう通知を受け取れます。',
+          '実行する時間が決まっている目標なら、リマインダーを設定しておくのがおすすめです。',
         ],
+        exampleAfterParagraphIndex: 3,
         examples: [
           {
-            title: '例',
             variant: 'daily',
-            blockTitle: '今日',
+            blockTitle: '月曜日',
+            blockDate: '1月1日',
             blockSubtitle: '0/5',
             inputPlaceholder: '今日の目標を追加',
             lines: [
@@ -612,23 +559,6 @@ const weekboardGuideJson: Record<string, GuideContent> = {
               'Z 荷物を送る',
             ],
           },
-        ],
-      },
-      {
-        title: '1)',
-        paragraphs: [
-          '日次目標にはロック機能があります。',
-          '目標をロックすると、その目標は使用できません。',
-          'この機能は、つい先延ばしにしたり削除したくなる目標を、最後まで実行する助けになります。',
-          'たとえば運動、勉強、読書のように、やる気はあるけれどよく先延ばしにしてしまう目標には、ロック機能を使ってみてください。',
-        ],
-      },
-      {
-        title: '2)',
-        paragraphs: [
-          '日次目標には時間リマインダー機能もあります。',
-          '目標にリマインダー時刻を設定すると、その時刻に目標を実行できるよう通知を受け取れます。',
-          '実行する時間が決まっている目標なら、リマインダーを設定しておくのがおすすめです。',
         ],
       },
       {
@@ -677,12 +607,11 @@ const weekboardGuideJson: Record<string, GuideContent> = {
         ],
         examples: [
           {
-            title: '예시',
             variant: 'top',
             blockTitle: '최상위 목표',
-            blockSubtitle: '3 목표',
+            blockSubtitle: '1 목표',
             inputPlaceholder: '최상위 목표 추가',
-            lines: ['A 건강 관리', 'B 경제적 안정', 'C 자기계발'],
+            lines: ['A 건강 관리'],
           },
         ],
       },
@@ -697,7 +626,6 @@ const weekboardGuideJson: Record<string, GuideContent> = {
         ],
         examples: [
           {
-            title: '예시',
             variant: 'weekly',
             blockTitle: '주간 목표',
             blockSubtitle: '3 목표',
@@ -712,12 +640,20 @@ const weekboardGuideJson: Record<string, GuideContent> = {
           '일간 목표는 오늘 실제로 실행할 목표를 관리하는 공간입니다.',
           '주간 목표에서 복제한 목표를 가져올 수도 있고, 오늘만 필요한 목표를 직접 추가할 수도 있습니다.',
           '일간 목표에서는 각 목표를 실행했는지 체크할 수 있습니다. 완료한 목표를 체크하면서 오늘의 실행 상태를 확인해 보세요.',
+          '1) 일간 목표에는 잠금 기능이 있습니다.',
+          '목표를 잠그면 해당 목표를 사용할 수 없습니다.',
+          '이 기능은 쉽게 미루거나 지워버리고 싶은 목표를 끝까지 실행하도록 도와줍니다.',
+          '예를 들어 운동, 공부, 독서처럼 의지는 있지만 자주 미루게 되는 목표는 잠금 기능을 사용해 보세요.',
+          '2) 일간 목표에는 시간 알림 기능도 있습니다.',
+          '목표에 알림 시간을 설정하면 해당 시간에 목표를 실행할 수 있도록 알림을 받을 수 있습니다.',
+          '실행 시간이 정해져 있는 목표라면 알림을 설정해 두는 것이 좋습니다.',
         ],
+        exampleAfterParagraphIndex: 3,
         examples: [
           {
-            title: '예시',
             variant: 'daily',
-            blockTitle: '오늘',
+            blockTitle: '월요일',
+            blockDate: '1월 1일',
             blockSubtitle: '0/5',
             inputPlaceholder: '오늘 목표 추가',
             lines: [
@@ -728,23 +664,6 @@ const weekboardGuideJson: Record<string, GuideContent> = {
               'Z 택배 보내기',
             ],
           },
-        ],
-      },
-      {
-        title: '1)',
-        paragraphs: [
-          '일간 목표에는 잠금 기능이 있습니다.',
-          '목표를 잠그면 해당 목표를 사용할 수 없습니다.',
-          '이 기능은 쉽게 미루거나 지워버리고 싶은 목표를 끝까지 실행하도록 도와줍니다.',
-          '예를 들어 운동, 공부, 독서처럼 의지는 있지만 자주 미루게 되는 목표는 잠금 기능을 사용해 보세요.',
-        ],
-      },
-      {
-        title: '2)',
-        paragraphs: [
-          '일간 목표에는 시간 알림 기능도 있습니다.',
-          '목표에 알림 시간을 설정하면 해당 시간에 목표를 실행할 수 있도록 알림을 받을 수 있습니다.',
-          '실행 시간이 정해져 있는 목표라면 알림을 설정해 두는 것이 좋습니다.',
         ],
       },
       {
@@ -793,12 +712,11 @@ const weekboardGuideJson: Record<string, GuideContent> = {
         ],
         examples: [
           {
-            title: '示例',
             variant: 'top',
             blockTitle: '最高层目标',
-            blockSubtitle: '3 目标',
+            blockSubtitle: '1 目标',
             inputPlaceholder: '添加最高层目标',
-            lines: ['A 健康管理', 'B 财务稳定', 'C 自我提升'],
+            lines: ['A 健康管理'],
           },
         ],
       },
@@ -813,7 +731,6 @@ const weekboardGuideJson: Record<string, GuideContent> = {
         ],
         examples: [
           {
-            title: '示例',
             variant: 'weekly',
             blockTitle: '每周目标',
             blockSubtitle: '3 目标',
@@ -832,12 +749,20 @@ const weekboardGuideJson: Record<string, GuideContent> = {
           '每日目标是管理今天实际要执行的目标的空间。',
           '你可以从每周目标中复制目标，也可以直接添加今天才需要的目标。',
           '在每日目标中，你可以勾选每个目标是否已执行。通过勾选已完成的目标，查看今天的执行状态。',
+          '1) 每日目标有锁定功能。',
+          '锁定目标后，该目标将无法使用。',
+          '这个功能可以帮助你坚持执行那些容易拖延或删除的目标。',
+          '例如运动、学习、阅读这类有意愿但经常拖延的目标，可以试试使用锁定功能。',
+          '2) 每日目标也有时间提醒功能。',
+          '为目标设置提醒时间后，你可以在相应时间收到通知，以便执行目标。',
+          '如果目标有固定执行时间，建议设置提醒。',
         ],
+        exampleAfterParagraphIndex: 3,
         examples: [
           {
-            title: '示例',
             variant: 'daily',
-            blockTitle: '今天',
+            blockTitle: '星期一',
+            blockDate: '1月1日',
             blockSubtitle: '0/5',
             inputPlaceholder: '添加今日目标',
             lines: [
@@ -848,23 +773,6 @@ const weekboardGuideJson: Record<string, GuideContent> = {
               'Z 寄快递',
             ],
           },
-        ],
-      },
-      {
-        title: '1)',
-        paragraphs: [
-          '每日目标有锁定功能。',
-          '锁定目标后，该目标将无法使用。',
-          '这个功能可以帮助你坚持执行那些容易拖延或删除的目标。',
-          '例如运动、学习、阅读这类有意愿但经常拖延的目标，可以试试使用锁定功能。',
-        ],
-      },
-      {
-        title: '2)',
-        paragraphs: [
-          '每日目标也有时间提醒功能。',
-          '为目标设置提醒时间后，你可以在相应时间收到通知，以便执行目标。',
-          '如果目标有固定执行时间，建议设置提醒。',
         ],
       },
       {
@@ -1032,28 +940,35 @@ function GuidePlannerBlock({ example }: { example: GuideExample }) {
   const variant = example.variant ?? 'top';
 
   return (
-    <div className='space-y-2'>
-      {example.title && (
-        <p className='text-[14px] font-semibold leading-6 text-black'>
-          {example.title}
-        </p>
-      )}
+    <section
+      className='rounded-[20px] bg-white p-4'
+      style={{
+        border: '1px solid var(--planner-border, rgba(17, 24, 39, 0.08))',
+      }}
+    >
+      <div className='flex w-full items-center justify-between'>
+        <div className='text-left'>
+          <h4 className='text-[15px] font-semibold text-black'>
+            {example.blockTitle}
+          </h4>
 
-      <section
-        className='rounded-[20px] bg-white p-4'
-        style={{
-          border: '1px solid rgba(17, 24, 39, 0.06)',
-        }}
-      >
-        <div className='flex w-full items-center justify-between'>
-          <div className='text-left'>
-            <h4 className='text-[15px] font-semibold text-black'>
-              {example.blockTitle}
-            </h4>
+          {variant === 'daily' && example.blockDate ? (
+            <p className='mt-1 text-[12px] leading-5 text-gray-500'>
+              {example.blockDate}
+            </p>
+          ) : (
             <p className='mt-0.5 text-[11px] text-gray-500'>
               {example.blockSubtitle}
             </p>
-          </div>
+          )}
+        </div>
+
+        <div className='flex items-center gap-3'>
+          {variant === 'daily' && (
+            <p className='text-[14px] font-semibold text-gray-500'>
+              {example.blockSubtitle}
+            </p>
+          )}
 
           <span
             className='flex h-7 w-7 items-center justify-center rounded-full text-gray-500'
@@ -1062,24 +977,24 @@ function GuidePlannerBlock({ example }: { example: GuideExample }) {
             <ChevronUp size={16} />
           </span>
         </div>
+      </div>
 
-        <div className='mt-3 space-y-1'>
-          {example.lines.map((line) =>
-            variant === 'daily' ? (
-              <GuideDailyRow key={line} line={line} />
-            ) : (
-              <GuideGoalRow
-                key={line}
-                line={line}
-                showCopy={variant === 'weekly'}
-              />
-            ),
-          )}
+      <div className='mt-3 space-y-1'>
+        {example.lines.map((line) =>
+          variant === 'daily' ? (
+            <GuideDailyRow key={line} line={line} />
+          ) : (
+            <GuideGoalRow
+              key={line}
+              line={line}
+              showCopy={variant === 'weekly'}
+            />
+          ),
+        )}
 
-          <GuideAddInput placeholder={example.inputPlaceholder ?? ''} />
-        </div>
-      </section>
-    </div>
+        <GuideAddInput placeholder={example.inputPlaceholder ?? ''} />
+      </div>
+    </section>
   );
 }
 
@@ -1146,13 +1061,16 @@ export function WeekboardGuideModal({
         onClick={(event) => event.stopPropagation()}
         className='flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-[24px] bg-white'
         style={{
-          backgroundColor: '#ffffff',
-          color: '#111827',
-          border: '1px solid rgba(17, 24, 39, 0.08)',
+          backgroundColor: 'var(--planner-card, #ffffff)',
+          color: 'var(--planner-text, #111827)',
+          border: '1px solid var(--planner-border, rgba(17, 24, 39, 0.08))',
         }}
       >
         <div className='shrink-0 px-5 pt-2'>
-          <div className='mx-auto h-1 w-10 rounded-full bg-gray-200' />
+          <div
+            className='mx-auto h-1 w-10 rounded-full'
+            style={{ backgroundColor: 'var(--planner-surface, #e5e7eb)' }}
+          />
         </div>
 
         <div className='flex shrink-0 items-center justify-between gap-3 px-5 py-4'>
@@ -1170,8 +1088,11 @@ export function WeekboardGuideModal({
         </div>
 
         <div
-          className='min-h-0 flex-1 overflow-y-auto border-t border-gray-100 px-5 py-5'
-          style={{ WebkitOverflowScrolling: 'touch' }}
+          className='min-h-0 flex-1 overflow-y-auto border-t px-5 py-5'
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            borderTopColor: 'var(--planner-border, #f3f4f6)',
+          }}
         >
           <div className='space-y-7'>
             {guide.sections.map((section) => (
@@ -1180,21 +1101,33 @@ export function WeekboardGuideModal({
                   {section.title}
                 </h3>
 
-                {section.paragraphs.map((paragraph) => (
-                  <p
-                    key={paragraph}
-                    className='whitespace-pre-line text-[15px] leading-7 text-black'
+                {section.paragraphs.map((paragraph, paragraphIndex) => (
+                  <div
+                    key={`${section.title}-paragraph-${paragraphIndex}`}
+                    className='space-y-3'
                   >
-                    {paragraph}
-                  </p>
+                    <p className='whitespace-pre-line text-[15px] leading-7 text-black'>
+                      {paragraph}
+                    </p>
+
+                    {section.exampleAfterParagraphIndex ===
+                      paragraphIndex + 1 &&
+                      section.examples?.map((example, exampleIndex) => (
+                        <GuidePlannerBlock
+                          key={`${section.title}-example-${exampleIndex}`}
+                          example={example}
+                        />
+                      ))}
+                  </div>
                 ))}
 
-                {section.examples?.map((example, index) => (
-                  <GuidePlannerBlock
-                    key={`${section.title}-example-${index}`}
-                    example={example}
-                  />
-                ))}
+                {!section.exampleAfterParagraphIndex &&
+                  section.examples?.map((example, index) => (
+                    <GuidePlannerBlock
+                      key={`${section.title}-example-${index}`}
+                      example={example}
+                    />
+                  ))}
 
                 {section.steps && (
                   <ol className='space-y-2'>
