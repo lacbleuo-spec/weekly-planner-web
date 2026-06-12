@@ -58,10 +58,11 @@ function extractWeeklyGoals(content: string, locale: Locale) {
       break;
     }
 
-    const cleaned = line
-      .replace(/^[-•]\s*/, '')
-      .replace(/^\d+\.\s*/, '')
-      .trim();
+    const goalMatch = line.match(/^[-•*]\s+(.+)$|^\d+\.\s+(.+)$/);
+
+    if (!goalMatch) continue;
+
+    const cleaned = (goalMatch[1] ?? goalMatch[2] ?? '').trim();
 
     if (!cleaned) continue;
     if (cleaned.length > 50) continue;
