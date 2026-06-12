@@ -103,7 +103,7 @@
     "title": "AI Planner",
     "subtitle": "Turn vague goals into actionable weekly goals",
     "emptyMessage": "Write down a vague goal.",
-    "studyExample": "Example: I want to get better at English",
+    "studyExample": "Example: Health management",
     "placeholder": "Type your goal",
     "loading": "Creating your plan...",
     "error": "Sorry, I cannot create a plan right now. Please try again later."

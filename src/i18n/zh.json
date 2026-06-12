@@ -103,7 +103,7 @@
     "title": "AI 计划器",
     "subtitle": "将模糊目标转化为可执行的每周目标",
     "emptyMessage": "写下一个模糊的目标。",
-    "studyExample": "示例：我想提高英语水平",
+    "studyExample": "示例：健康管理",
     "placeholder": "输入你的目标",
     "loading": "正在创建你的计划...",
     "error": "抱歉，目前无法创建计划，请稍后再试。"

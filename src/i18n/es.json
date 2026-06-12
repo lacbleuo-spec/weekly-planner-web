@@ -103,7 +103,7 @@
     "title": "Planificador IA",
     "subtitle": "Convierte metas vagas en metas semanales accionables",
     "emptyMessage": "Escribe una meta vaga.",
-    "studyExample": "Ejemplo: Quiero mejorar mi inglés",
+    "studyExample": "Ejemplo: Gestión de salud",
     "placeholder": "Escribe tu meta",
     "loading": "Creando tu plan...",
     "error": "Lo sentimos, no puedo crear un plan en este momento. Inténtalo de nuevo más tarde."

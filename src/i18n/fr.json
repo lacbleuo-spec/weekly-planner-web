@@ -103,7 +103,7 @@
     "title": "Planificateur IA",
     "subtitle": "Transformez des objectifs vagues en objectifs hebdomadaires concrets",
     "emptyMessage": "Écrivez un objectif vague.",
-    "studyExample": "Exemple : Je veux améliorer mon anglais",
+    "studyExample": "Exemple : Gestion de la santé",
     "placeholder": "Saisissez votre objectif",
     "loading": "Création de votre plan...",
     "error": "Désolé, je ne peux pas créer de plan pour le moment. Veuillez réessayer plus tard."

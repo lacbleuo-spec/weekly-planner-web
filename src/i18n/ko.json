@@ -103,7 +103,7 @@
     "title": "AI 플래너",
     "subtitle": "막연한 목표를 실행 가능한 주간 목표로 바꿔보세요",
     "emptyMessage": "막연한 목표를 적어보세요.",
-    "studyExample": "예시: 영어를 더 잘하고 싶어요",
+    "studyExample": "예시: 건강 관리",
     "placeholder": "목표를 입력하세요",
     "loading": "계획을 만드는 중...",
     "error": "죄송합니다. 지금은 계획을 만들 수 없습니다. 잠시 후 다시 시도해주세요."
