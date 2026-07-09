@@ -309,10 +309,13 @@ export async function saveWeeklyGoal(
   userId: string,
   plan: FirebaseWeeklyPlan,
   goal: FirebaseWeeklyGoal,
+  syncPlanMeta = false,
 ) {
   const key = weekKey(plan.weekStartDate.toDate());
 
-  await saveWeeklyPlanMeta(userId, plan);
+  if (syncPlanMeta) {
+    await saveWeeklyPlanMeta(userId, plan);
+  }
 
   await setDoc(
     weeklyGoalDoc(userId, goal.id),
@@ -328,24 +331,27 @@ export async function saveWeeklyGoals(
   userId: string,
   plan: FirebaseWeeklyPlan,
   goals: FirebaseWeeklyGoal[],
+  syncPlanMeta = false,
 ) {
   const key = weekKey(plan.weekStartDate.toDate());
   const weekStartDate = startOfWeek(plan.weekStartDate.toDate());
   const weekEndDate = endOfWeek(plan.weekStartDate.toDate());
   const batch = writeBatch(db);
 
-  batch.set(
-    weeklyPlanDoc(userId, key),
-    cleanUndefined({
-      id: key,
-      weekStartDate: Timestamp.fromDate(weekStartDate),
-      weekEndDate: Timestamp.fromDate(weekEndDate),
-      createdAt: plan.createdAt,
-      updatedAt: plan.updatedAt ?? Timestamp.now(),
-      deletedAt: plan.deletedAt ?? null,
-    }),
-    { merge: true },
-  );
+  if (syncPlanMeta) {
+    batch.set(
+      weeklyPlanDoc(userId, key),
+      cleanUndefined({
+        id: key,
+        weekStartDate: Timestamp.fromDate(weekStartDate),
+        weekEndDate: Timestamp.fromDate(weekEndDate),
+        createdAt: plan.createdAt,
+        updatedAt: plan.updatedAt ?? Timestamp.now(),
+        deletedAt: plan.deletedAt ?? null,
+      }),
+      { merge: true },
+    );
+  }
 
   for (const goal of goals) {
     batch.set(
@@ -365,10 +371,13 @@ export async function saveDailyGoal(
   userId: string,
   plan: FirebaseWeeklyPlan,
   goal: FirebaseDailyGoal,
+  syncPlanMeta = false,
 ) {
   const key = weekKey(plan.weekStartDate.toDate());
 
-  await saveWeeklyPlanMeta(userId, plan);
+  if (syncPlanMeta) {
+    await saveWeeklyPlanMeta(userId, plan);
+  }
 
   await setDoc(
     dailyGoalDoc(userId, goal.id),
@@ -384,24 +393,27 @@ export async function saveDailyGoals(
   userId: string,
   plan: FirebaseWeeklyPlan,
   goals: FirebaseDailyGoal[],
+  syncPlanMeta = false,
 ) {
   const key = weekKey(plan.weekStartDate.toDate());
   const weekStartDate = startOfWeek(plan.weekStartDate.toDate());
   const weekEndDate = endOfWeek(plan.weekStartDate.toDate());
   const batch = writeBatch(db);
 
-  batch.set(
-    weeklyPlanDoc(userId, key),
-    cleanUndefined({
-      id: key,
-      weekStartDate: Timestamp.fromDate(weekStartDate),
-      weekEndDate: Timestamp.fromDate(weekEndDate),
-      createdAt: plan.createdAt,
-      updatedAt: plan.updatedAt ?? Timestamp.now(),
-      deletedAt: plan.deletedAt ?? null,
-    }),
-    { merge: true },
-  );
+  if (syncPlanMeta) {
+    batch.set(
+      weeklyPlanDoc(userId, key),
+      cleanUndefined({
+        id: key,
+        weekStartDate: Timestamp.fromDate(weekStartDate),
+        weekEndDate: Timestamp.fromDate(weekEndDate),
+        createdAt: plan.createdAt,
+        updatedAt: plan.updatedAt ?? Timestamp.now(),
+        deletedAt: plan.deletedAt ?? null,
+      }),
+      { merge: true },
+    );
+  }
 
   for (const goal of goals) {
     batch.set(

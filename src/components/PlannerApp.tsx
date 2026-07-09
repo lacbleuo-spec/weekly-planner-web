@@ -50,6 +50,7 @@ import {
   saveWeeklyGoals,
   subscribePlannerData,
 } from '@/services/plannerService';
+import { flushPendingWrites, scheduleWrite } from '@/lib/writeQueue';
 import {
   FirebaseDailyGoal,
   FirebaseSomedayGoal,
@@ -453,6 +454,22 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     return () => unsubscribe();
   }, [auth.isLoading, auth.user]);
 
+  useEffect(() => {
+    function flushOnHide() {
+      if (document.visibilityState === 'hidden') {
+        void flushPendingWrites();
+      }
+    }
+
+    document.addEventListener('visibilitychange', flushOnHide);
+    window.addEventListener('pagehide', flushOnHide);
+
+    return () => {
+      document.removeEventListener('visibilitychange', flushOnHide);
+      window.removeEventListener('pagehide', flushOnHide);
+    };
+  }, []);
+
   const selectedWeekEndDate = useMemo(
     () => endOfWeek(selectedWeekStartDate),
     [selectedWeekStartDate],
@@ -612,13 +629,17 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
   async function syncWeeklyGoalChange(
     updatedPlan: FirebaseWeeklyPlan,
     goal: FirebaseWeeklyGoal,
+    isNewPlan = false,
   ) {
     savePlanChange(updatedPlan);
 
     if (!auth.user) return;
+    const userId = auth.user.uid;
 
     try {
-      await saveWeeklyGoal(auth.user.uid, updatedPlan, goal);
+      await scheduleWrite(`weeklyGoal:${goal.id}`, () =>
+        saveWeeklyGoal(userId, updatedPlan, goal, isNewPlan),
+      );
       markSynced();
     } catch (error) {
       setSyncError(
@@ -630,13 +651,17 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
   async function syncWeeklyGoalsChange(
     updatedPlan: FirebaseWeeklyPlan,
     goals: FirebaseWeeklyGoal[],
+    isNewPlan = false,
   ) {
     savePlanChange(updatedPlan);
 
     if (!auth.user) return;
+    if (goals.length === 0 && !isNewPlan) return;
 
+    // Not debounced: each call only carries its own partial order diff, so
+    // coalescing under a shared key would drop earlier calls' doc writes.
     try {
-      await saveWeeklyGoals(auth.user.uid, updatedPlan, goals);
+      await saveWeeklyGoals(auth.user.uid, updatedPlan, goals, isNewPlan);
       markSynced();
     } catch (error) {
       setSyncError(
@@ -648,13 +673,17 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
   async function syncDailyGoalChange(
     updatedPlan: FirebaseWeeklyPlan,
     goal: FirebaseDailyGoal,
+    isNewPlan = false,
   ) {
     savePlanChange(updatedPlan);
 
     if (!auth.user) return;
+    const userId = auth.user.uid;
 
     try {
-      await saveDailyGoal(auth.user.uid, updatedPlan, goal);
+      await scheduleWrite(`dailyGoal:${goal.id}`, () =>
+        saveDailyGoal(userId, updatedPlan, goal, isNewPlan),
+      );
       markSynced();
     } catch (error) {
       setSyncError(
@@ -666,13 +695,17 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
   async function syncDailyGoalsChange(
     updatedPlan: FirebaseWeeklyPlan,
     goals: FirebaseDailyGoal[],
+    isNewPlan = false,
   ) {
     savePlanChange(updatedPlan);
 
     if (!auth.user) return;
+    if (goals.length === 0 && !isNewPlan) return;
 
+    // Not debounced: each call only carries its own partial order diff, so
+    // coalescing under a shared key would drop earlier calls' doc writes.
     try {
-      await saveDailyGoals(auth.user.uid, updatedPlan, goals);
+      await saveDailyGoals(auth.user.uid, updatedPlan, goals, isNewPlan);
       markSynced();
     } catch (error) {
       setSyncError(
@@ -688,9 +721,12 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     saveSomedayGoalsChange(updatedGoals);
 
     if (!auth.user) return;
+    const userId = auth.user.uid;
 
     try {
-      await saveSomedayGoal(auth.user.uid, goal);
+      await scheduleWrite(`somedayGoal:${goal.id}`, () =>
+        saveSomedayGoal(userId, goal),
+      );
       markSynced();
     } catch (error) {
       setSyncError(
@@ -706,6 +742,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     saveSomedayGoalsChange(updatedGoals);
 
     if (!auth.user) return;
+    if (changedGoals.length === 0) return;
 
     try {
       await saveSomedayGoals(auth.user.uid, changedGoals);
@@ -819,17 +856,20 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
       return;
     }
 
+    const originalOrder = new Map(
+      sameLabelGoals.map((goal) => [goal.id, goal.order]),
+    );
+
     sameLabelGoals.splice(
       newIndex,
       0,
       sameLabelGoals.splice(currentIndex, 1)[0],
     );
 
-    const reorderedGoals = sameLabelGoals.map((goal, index) => ({
-      ...goal,
-      order: index,
-      updatedAt: now(),
-    }));
+    const timestamp = now();
+    const reorderedGoals = sameLabelGoals
+      .map((goal, index) => ({ ...goal, order: index, updatedAt: timestamp }))
+      .filter((goal) => goal.order !== originalOrder.get(goal.id));
 
     const nextGoals = somedayGoals.map(
       (goal) => reorderedGoals.find((g) => g.id === goal.id) ?? goal,
@@ -860,6 +900,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     const text = (title ?? newWeeklyGoalText).trim();
     if (!text) return;
 
+    const isNewPlan = !currentPlan;
     const plan = currentPlan ?? makeCurrentWeekPlan();
     const createdAt = now();
 
@@ -885,7 +926,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
       setNewWeeklyGoalText('');
     }
 
-    syncWeeklyGoalChange(updatedPlan, goal);
+    syncWeeklyGoalChange(updatedPlan, goal, isNewPlan);
   }
 
   function deleteWeeklyGoal(goalId: string) {
@@ -927,17 +968,20 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
       return;
     }
 
+    const originalOrder = new Map(
+      sameLabelGoals.map((goal) => [goal.id, goal.order]),
+    );
+
     sameLabelGoals.splice(
       newIndex,
       0,
       sameLabelGoals.splice(currentIndex, 1)[0],
     );
 
-    const reorderedGoals = sameLabelGoals.map((goal, index) => ({
-      ...goal,
-      order: index,
-      updatedAt: now(),
-    }));
+    const timestamp = now();
+    const reorderedGoals = sameLabelGoals
+      .map((goal, index) => ({ ...goal, order: index, updatedAt: timestamp }))
+      .filter((goal) => goal.order !== originalOrder.get(goal.id));
 
     const updatedPlan = {
       ...currentPlan,
@@ -982,6 +1026,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     );
   }
   function copyWeeklyGoalToDailyGoal(goal: FirebaseWeeklyGoal, dates: Date[]) {
+    const isNewPlan = !currentPlan;
     const plan = currentPlan ?? makeCurrentWeekPlan();
     const createdAt = now();
 
@@ -1006,18 +1051,20 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
       dailyGoals: [...plan.dailyGoals, ...newGoals],
     };
 
-    syncDailyGoalsChange(updatedPlan, newGoals);
+    syncDailyGoalsChange(updatedPlan, newGoals, isNewPlan);
   }
 
   function copyWeeklyGoalToNextWeek(goalToCopy: FirebaseWeeklyGoal) {
     const nextWeekStartDate = addingDays(selectedWeekStartDate, 7);
 
+    const existingNextWeekPlan = weeklyPlans.find(
+      (plan) =>
+        !plan.deletedAt &&
+        weekKey(plan.weekStartDate.toDate()) === weekKey(nextWeekStartDate),
+    );
+    const isNewPlan = !existingNextWeekPlan;
     const nextWeekPlan =
-      weeklyPlans.find(
-        (plan) =>
-          !plan.deletedAt &&
-          weekKey(plan.weekStartDate.toDate()) === weekKey(nextWeekStartDate),
-      ) ?? makePlanForWeek(nextWeekStartDate);
+      existingNextWeekPlan ?? makePlanForWeek(nextWeekStartDate);
 
     const visibleNextWeekGoals = nextWeekPlan.weeklyGoals.filter(
       (goal) => !goal.deletedAt,
@@ -1041,7 +1088,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
       weeklyGoals: [...nextWeekPlan.weeklyGoals, goal],
     };
 
-    syncWeeklyGoalChange(updatedPlan, goal);
+    syncWeeklyGoalChange(updatedPlan, goal, isNewPlan);
   }
 
   function addDailyGoal(date: Date) {
@@ -1049,6 +1096,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     const text = (newGoalTexts[key] ?? '').trim();
     if (!text) return;
 
+    const isNewPlan = !currentPlan;
     const plan = currentPlan ?? makeCurrentWeekPlan();
     const createdAt = now();
 
@@ -1074,7 +1122,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
     };
 
     setNewGoalTexts((prev) => ({ ...prev, [key]: '' }));
-    syncDailyGoalChange(updatedPlan, goal);
+    syncDailyGoalChange(updatedPlan, goal, isNewPlan);
   }
 
   function toggleDailyGoal(goalId: string) {
@@ -1217,17 +1265,20 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
       return;
     }
 
+    const originalOrder = new Map(
+      sameLabelGoals.map((goal) => [goal.id, goal.order]),
+    );
+
     sameLabelGoals.splice(
       newIndex,
       0,
       sameLabelGoals.splice(currentIndex, 1)[0],
     );
 
-    const reorderedGoals = sameLabelGoals.map((goal, index) => ({
-      ...goal,
-      order: index,
-      updatedAt: now(),
-    }));
+    const timestamp = now();
+    const reorderedGoals = sameLabelGoals
+      .map((goal, index) => ({ ...goal, order: index, updatedAt: timestamp }))
+      .filter((goal) => goal.order !== originalOrder.get(goal.id));
 
     const updatedPlan = {
       ...currentPlan,
@@ -1309,8 +1360,8 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
 
     try {
       await Promise.all([
-        saveWeeklyGoals(auth.user.uid, updatedPlan, deletedWeeklyGoals),
-        saveDailyGoals(auth.user.uid, updatedPlan, deletedDailyGoals),
+        saveWeeklyGoals(auth.user.uid, updatedPlan, deletedWeeklyGoals, true),
+        saveDailyGoals(auth.user.uid, updatedPlan, deletedDailyGoals, true),
       ]);
 
       markSynced();
@@ -3305,6 +3356,7 @@ function AuthModal({
   }
 
   async function signOutAndClearLocalData() {
+    await flushPendingWrites();
     onDeleteLocalData();
     await auth.signOut();
     onClose();
@@ -3333,6 +3385,7 @@ function AuthModal({
     auth.setErrorMessage(null);
 
     try {
+      await flushPendingWrites();
       await deleteCloudUserData(auth.user.uid);
       onDeleteLocalData();
       await auth.reauthenticateAndDelete(reauthPassword);

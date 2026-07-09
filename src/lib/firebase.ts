@@ -2,7 +2,12 @@
 
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyB-Yj_5VFcf5DJC7MFuOpyMkek7Cgb9cGY',
@@ -16,4 +21,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Persists Firestore's listener cache across reloads so onSnapshot only
+// pulls deltas on reattach instead of re-reading every document.
+// IndexedDB isn't available during SSR, so fall back to the default
+// memory-cache client there (module code runs once server-side for the
+// initial render of this 'use client' component, but no I/O happens).
+export const db =
+  typeof window === 'undefined'
+    ? getFirestore(app)
+    : initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+      });
