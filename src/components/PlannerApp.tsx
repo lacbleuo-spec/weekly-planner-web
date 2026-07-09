@@ -42,6 +42,8 @@ import {
 } from '@/lib/date';
 import {
   deleteCloudUserData,
+  fetchWeekPlan,
+  isDateInLiveRange,
   saveDailyGoal,
   saveDailyGoals,
   saveSomedayGoal,
@@ -339,6 +341,7 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
   const [selectedWeekStartDate, setSelectedWeekStartDate] = useState(
     startOfWeek(new Date()),
   );
+  const fetchedOutOfRangeWeeksRef = useRef<Set<string>>(new Set());
 
   const [weeklyPlans, setWeeklyPlans] = useState<FirebaseWeeklyPlan[]>([]);
   const [somedayGoals, setSomedayGoals] = useState<FirebaseSomedayGoal[]>([]);
@@ -422,6 +425,8 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
   useEffect(() => {
     if (auth.isLoading) return;
 
+    fetchedOutOfRangeWeeksRef.current.clear();
+
     if (!auth.user) {
       queueMicrotask(() => {
         setWeeklyPlans([]);
@@ -453,6 +458,27 @@ export default function PlannerApp({ locale }: { locale: Locale }) {
 
     return () => unsubscribe();
   }, [auth.isLoading, auth.user]);
+
+  useEffect(() => {
+    if (!auth.user) return;
+    if (isDateInLiveRange(selectedWeekStartDate)) return;
+
+    const key = weekKey(selectedWeekStartDate);
+    if (fetchedOutOfRangeWeeksRef.current.has(key)) return;
+
+    fetchedOutOfRangeWeeksRef.current.add(key);
+    const userId = auth.user.uid;
+
+    fetchWeekPlan(userId, selectedWeekStartDate)
+      .then((plan) => {
+        if (!plan) return;
+        setWeeklyPlans((prev) => upsertPlan(prev, plan));
+      })
+      .catch((error) => {
+        fetchedOutOfRangeWeeksRef.current.delete(key);
+        setSyncError(error instanceof Error ? error.message : String(error));
+      });
+  }, [auth.user, selectedWeekStartDate]);
 
   useEffect(() => {
     function flushOnHide() {

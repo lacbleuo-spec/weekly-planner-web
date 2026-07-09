@@ -4,12 +4,14 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   query,
   setDoc,
   Timestamp,
   Unsubscribe,
+  where,
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -19,7 +21,7 @@ import {
   FirebaseWeeklyGoal,
   FirebaseWeeklyPlan,
 } from '@/models/planner';
-import { endOfWeek, startOfWeek, weekKey } from '@/lib/date';
+import { addingDays, endOfWeek, startOfWeek, weekKey } from '@/lib/date';
 
 type FirebaseWeeklyGoalDocument = FirebaseWeeklyGoal & {
   weekKey: string;
@@ -96,6 +98,30 @@ function dateFromDayKey(key: string): Date {
 
 function canonicalWeekKey(key: string): string {
   return weekKey(dateFromDayKey(key));
+}
+
+// The live listeners only cover last/this/next week. weekKey() always
+// anchors to Sunday regardless of the user's display preference, so a
+// Monday-start display's "next week" view runs one day into the week after
+// next (its trailing Sunday belongs to that later week) — extend the
+// forward bound by one extra week so that day is still covered.
+const WEEKS_BACK = 1;
+const WEEKS_FORWARD = 2;
+
+export function liveRangeKeys(): { start: string; end: string } {
+  const thisWeekStart = startOfWeek(new Date());
+
+  return {
+    start: weekKey(addingDays(thisWeekStart, -WEEKS_BACK * 7)),
+    end: weekKey(addingDays(thisWeekStart, WEEKS_FORWARD * 7)),
+  };
+}
+
+export function isDateInLiveRange(date: Date): boolean {
+  const { start, end } = liveRangeKeys();
+  const key = weekKey(date);
+
+  return key >= start && key <= end;
 }
 
 function makePlanMetaFromDate(date: Date): FirebaseWeeklyPlanMeta {
@@ -220,9 +246,15 @@ export function subscribePlannerData(
     });
   }
 
+  const { start: liveRangeStart, end: liveRangeEnd } = liveRangeKeys();
+
   const unsubscribes = [
     onSnapshot(
-      query(weeklyPlansCollection(userId)),
+      query(
+        weeklyPlansCollection(userId),
+        where('id', '>=', liveRangeStart),
+        where('id', '<=', liveRangeEnd),
+      ),
       (snapshot) => {
         if (snapshot.metadata.hasPendingWrites) return;
 
@@ -236,7 +268,11 @@ export function subscribePlannerData(
     ),
 
     onSnapshot(
-      query(weeklyGoalsCollection(userId)),
+      query(
+        weeklyGoalsCollection(userId),
+        where('weekKey', '>=', liveRangeStart),
+        where('weekKey', '<=', liveRangeEnd),
+      ),
       (snapshot) => {
         if (snapshot.metadata.hasPendingWrites) return;
 
@@ -250,7 +286,11 @@ export function subscribePlannerData(
     ),
 
     onSnapshot(
-      query(dailyGoalsCollection(userId)),
+      query(
+        dailyGoalsCollection(userId),
+        where('weekKey', '>=', liveRangeStart),
+        where('weekKey', '<=', liveRangeEnd),
+      ),
       (snapshot) => {
         if (snapshot.metadata.hasPendingWrites) return;
 
@@ -280,6 +320,52 @@ export function subscribePlannerData(
 
   return () => {
     unsubscribes.forEach((unsubscribe) => unsubscribe());
+  };
+}
+
+/**
+ * One-time (non-live) fetch for a week outside the live listener range, e.g.
+ * when the user navigates far in the past/future. Returns null if the week
+ * has no data at all.
+ */
+export async function fetchWeekPlan(
+  userId: string,
+  weekStartDate: Date,
+): Promise<FirebaseWeeklyPlan | null> {
+  const key = weekKey(weekStartDate);
+
+  const [metaSnap, weeklyGoalsSnap, dailyGoalsSnap] = await Promise.all([
+    getDoc(weeklyPlanDoc(userId, key)),
+    getDocs(query(weeklyGoalsCollection(userId), where('weekKey', '==', key))),
+    getDocs(query(dailyGoalsCollection(userId), where('weekKey', '==', key))),
+  ]);
+
+  const weeklyGoals = weeklyGoalsSnap.docs
+    .map((doc) => doc.data() as FirebaseWeeklyGoalDocument)
+    .map(removeWeekKeyFromWeeklyGoal)
+    .sort((a, b) => a.order - b.order);
+
+  const dailyGoals = dailyGoalsSnap.docs
+    .map((doc) => doc.data() as FirebaseDailyGoalDocument)
+    .map(removeWeekKeyFromDailyGoal)
+    .sort((a, b) => {
+      const dateDiff = a.date.toMillis() - b.date.toMillis();
+      return dateDiff !== 0 ? dateDiff : a.order - b.order;
+    });
+
+  if (!metaSnap.exists() && weeklyGoals.length === 0 && dailyGoals.length === 0) {
+    return null;
+  }
+
+  const meta = metaSnap.exists()
+    ? (metaSnap.data() as FirebaseWeeklyPlanMeta)
+    : makePlanMetaFromDate(weekStartDate);
+
+  return {
+    ...meta,
+    id: key,
+    weeklyGoals,
+    dailyGoals,
   };
 }
 
