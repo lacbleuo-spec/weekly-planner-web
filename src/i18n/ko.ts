@@ -1,0 +1,162 @@
+// 번역의 기준(소스) 언어. 이후 en.ts 등 같은 모양의 딕셔너리를 추가해 언어를 늘릴 수 있다.
+const ko = {
+  app: {
+    title: '위크보드',
+  },
+  topbar: {
+    export: '내보내기',
+    import: '가져오기',
+  },
+  canvas: {
+    emptyIntro: '위크보드는 목적, 목표, 루틴, 일정을 한 번에 관리하는 플래닝 도구입니다.',
+    emptyHint: '오른쪽 아래 + 버튼으로 위젯을 추가하고 원하는 위치로 옮겨보세요.',
+  },
+  zoom: {
+    zoomIn: '확대',
+    zoomOut: '축소',
+    reset: '보기 초기화',
+  },
+  widgetMenu: {
+    heading: '캔버스에 추가할 위젯',
+    open: '위젯 추가',
+  },
+  widgets: {
+    lifeLine: {
+      title: '인생 한 줄',
+      empty: '아직 인생 한 줄이 없어요.',
+      addPlaceholder: '인생 한 줄 추가',
+    },
+    topGoal: {
+      title: '최상위 목표',
+      empty: '아직 최상위 목표가 없어요.',
+      addPlaceholder: '최상위 목표 추가',
+    },
+    roadmap: {
+      title: '생각 정리',
+      needTopGoal: '먼저 최상위 목표를 추가해주세요.',
+      empty: '이 목표를 위해 떠오르는 생각을 추가해보세요.',
+      addPlaceholder: '새 항목',
+      addChildPlaceholder: '하위 항목',
+      addChild: '하위 추가',
+    },
+    weeklyGoal: {
+      title: '주간 목표',
+      empty: '이번 주 실행할 행동을 추가해보세요.',
+      addPlaceholder: '이번 주 행동 추가',
+    },
+    timetable: {
+      title: '시간표',
+      addRoutine: '루틴 추가',
+      titlePlaceholder: '제목',
+      dayLabel: '요일',
+      startsLabel: '시작',
+      endsLabel: '종료',
+      overlapError: '이미 같은 시간대에 다른 루틴이 있어요.',
+      empty: '아직 추가된 루틴이 없어요.',
+      dragHint: '핸들을 드래그해서 시간을 정해보세요.',
+      save: '저장',
+      cancel: '취소',
+      delete: '삭제',
+    },
+    weeklyTimeline: {
+      title: '캘린더',
+      today: '오늘',
+      allDay: '하루종일',
+      noEvents: '이 날은 일정이 없어요.',
+      addEvent: '이벤트 추가',
+      eventTitlePlaceholder: '제목',
+      eventTitleLabel: '제목',
+      allDayLabel: '하루종일',
+      startsLabel: '시작',
+      endsLabel: '종료',
+      rangeError: '종료 시각이 시작 시각보다 빠를 수 없어요.',
+      alarmLabel: '알림',
+      alarmNone: '없음',
+      alarmAtTime: '이벤트 시간에',
+      alarmMin5: '5분 전',
+      alarmMin10: '10분 전',
+      alarmMin15: '15분 전',
+      alarmMin30: '30분 전',
+      alarmHour1: '1시간 전',
+      alarmHour2: '2시간 전',
+      alarmDay1: '1일 전',
+      alarmDay2: '2일 전',
+      alarmWeek1: '1주 전',
+      save: '저장',
+      cancel: '취소',
+      delete: '삭제',
+    },
+    dailyGoal: {
+      title: '일간 목표',
+      empty: '오늘 실행할 항목이 없어요.',
+      fromWeek: '이번 주 목표에서 배분',
+      addToday: '오늘 추가',
+      exclude: '제외',
+      deletedItem: '(삭제된 항목)',
+    },
+  },
+  common: {
+    add: '추가',
+    delete: '삭제',
+    cancel: '취소',
+    confirm: '확인',
+  },
+  confirm: {
+    importTitle: '파일 불러오기',
+    importMessage: '선택한 파일의 내용으로 지금 캔버스를 덮어씁니다. 계속할까요?',
+    importConfirm: '불러오기',
+  },
+  alerts: {
+    exportDoneMessage: '파일로 내보냈어요.',
+    exportFailTitle: '내보내기에 실패했어요.',
+    importDoneMessage: '파일을 불러왔어요.',
+    importFailTitle: '파일을 불러오지 못했어요.',
+    importInvalidFileMessage: '위크보드 파일이 아니에요.',
+  },
+  date: {
+    weekdaysShort: ['일', '월', '화', '수', '목', '금', '토'],
+    weekdaysMonFirst: ['월', '화', '수', '목', '금', '토', '일'],
+  },
+  widgetGuide: {
+    perWidgetToggleLabel: '이 위젯 가이드 표시',
+    exampleLabel: '예시',
+    lifeLine: {
+      title: '내가 살아가고 싶은 삶의 방향을 한 문장으로 적어보세요.',
+      body: '거창하거나 완벽한 문장일 필요는 없습니다. 여러 목표 사이에서 길을 잃을 때 다시 돌아볼 수 있는, 나에게 중요한 삶의 방향이면 충분합니다.',
+      example: '나의 하루를 사랑하고, 그 사랑으로 누군가의 가슴을 뛰게 하는 삶',
+    },
+    topGoal: {
+      title: '내가 계속 돌보고 싶은 삶의 중요한 영역을 적어보세요.',
+      body: '구체적인 방법이나 단기적인 성과보다는, 오랫동안 중요하게 가져가고 싶은 영역을 정합니다. 방법은 달라져도 이 영역은 계속 나의 방향을 잡아줍니다.',
+      example: '건강 관리, 수입 증가, 글쓰기',
+    },
+    roadmap: {
+      title: '최상위 목표를 어떻게 실천할 수 있을지 자유롭게 생각을 펼쳐보세요.',
+      body: '처음부터 연간·분기·월간 계획으로 촘촘하게 나눌 필요는 없습니다. 무엇을 해볼 수 있을지 충분히 생각하고, 그중 오늘 당장 실행할 수 있을 정도로 구체적인 행동까지 내려가 봅니다.\n아직 실행 기간은 정하지 않아도 됩니다. 실제로 해보며 알게 되는 것에 따라 계획은 언제든 바뀔 수 있습니다.',
+      example: '건강 관리 → 체력 높이기 → 30분 걷기',
+    },
+    weeklyGoal: {
+      title: '이번 주에 실행할 구체적인 행동을 정해보세요.',
+      body: '주간 목표는 일주일 뒤 만들어낼 성과가 아니라, 이번 주에 실제로 실행할 행동의 목록입니다. 일간 목표에 그대로 옮겨 적을 수 있을 만큼 구체적으로 작성하면 좋습니다.\n어느 날 실행할지는 나중에 정해도 됩니다.',
+      example: '30분 걷기, 물 2L 마시기, 브런치 글 1개 올리기',
+    },
+    dailyGoal: {
+      title: '주간 목표 중 오늘 실행할 행동을 골라보세요.',
+      body: '오늘을 위해 새로운 목표를 만들 필요는 없습니다. 이번 주에 하기로 한 행동 가운데 오늘 할 수 있는 것을 선택하면 됩니다.\n하루를 가득 채우기보다, 오늘 실제로 해낼 수 있는 만큼만 계획해보세요.',
+      example: '30분 걷기, 물 2L 마시기',
+    },
+    timetable: {
+      title: '매일 반복되는 일상의 흐름을 시간표에 적어보세요.',
+      body: '기상, 출퇴근, 식사, 집안일, 취침처럼 이미 반복되고 있는 일은 목표로 만들 필요가 없습니다. 시간표에 먼저 배치하면 하루 중 이미 사용하고 있는 시간과 자유롭게 사용할 수 있는 시간이 자연스럽게 보입니다.\n남은 시간을 확인한 뒤, 그 안에 오늘의 목표를 배치해보세요.',
+      example: '수면, 출근, 점심, 퇴근, 집안일',
+    },
+    weeklyTimeline: {
+      title: '특정한 날짜와 시간이 정해진 일정을 기록하세요.',
+      body: '약속, 예약, 미팅처럼 한 번 정해지면 그 시간을 비워두어야 하는 일은 캘린더에서 관리합니다. 이번 주의 일정을 먼저 확인하면 실제로 목표에 사용할 수 있는 시간도 알 수 있습니다.\n일정에 맞춰 목표의 양이나 실행 시간을 조절해보세요.',
+      example: '친구와 저녁 약속, 병원 예약, 업무 미팅, 가족 행사, 공연 관람, 출장',
+    },
+  },
+};
+
+export default ko;
+export type Dictionary = typeof ko;
