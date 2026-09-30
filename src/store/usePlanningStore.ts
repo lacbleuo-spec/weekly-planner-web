@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { createId } from '../lib/id';
 import type {
@@ -88,10 +87,8 @@ const emptyState = {
   widgets: [],
 };
 
-export const usePlanningStore = create<PlanningState>()(
-  persist(
-    (set, get) => ({
-      ...emptyState,
+export const usePlanningStore = create<PlanningState>()((set, get) => ({
+  ...emptyState,
 
       addLifeLine: (title) =>
         set((s) => ({
@@ -252,20 +249,5 @@ export const usePlanningStore = create<PlanningState>()(
           dailyAssignments: snapshot.dailyAssignments ?? [],
           widgets: snapshot.widgets ?? [],
         }),
-    }),
-    {
-      name: 'weekboard/planning-store',
-      storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({
-        lifeLines: s.lifeLines,
-        topGoals: s.topGoals,
-        roadmapNodes: s.roadmapNodes,
-        weeklyGoals: s.weeklyGoals,
-        events: s.events,
-        routineBlocks: s.routineBlocks,
-        dailyAssignments: s.dailyAssignments,
-        widgets: s.widgets,
-      }),
-    }
-  )
+    })
 );
