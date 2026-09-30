@@ -1,4 +1,4 @@
-import { Pencil, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, Plus, X } from 'lucide-react';
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 import { useDict } from '../../i18n';
@@ -17,6 +17,7 @@ export function RoadmapWidget({ widgetId, topGoalId }: RoadmapWidgetProps) {
   const roadmapNodes = usePlanningStore((s) => s.roadmapNodes);
   const addRoadmapNode = usePlanningStore((s) => s.addRoadmapNode);
   const updateRoadmapNode = usePlanningStore((s) => s.updateRoadmapNode);
+  const moveRoadmapNode = usePlanningStore((s) => s.moveRoadmapNode);
   const deleteRoadmapNode = usePlanningStore((s) => s.deleteRoadmapNode);
   const setWidgetConfig = usePlanningStore((s) => s.setWidgetConfig);
   const [addingParent, setAddingParent] = useState<string | null>(null);
@@ -31,6 +32,7 @@ export function RoadmapWidget({ widgetId, topGoalId }: RoadmapWidgetProps) {
   );
   const roots = nodes.filter((n) => n.parentId === null);
   const childrenOf = (id: string) => nodes.filter((n) => n.parentId === id);
+  const siblingsOf = (node: RoadmapNode) => nodes.filter((n) => n.parentId === node.parentId);
 
   if (topGoals.length === 0) {
     return <p className="text-[13px] text-faint">{dict.widgets.roadmap.needTopGoal}</p>;
@@ -56,6 +58,8 @@ export function RoadmapWidget({ widgetId, topGoalId }: RoadmapWidgetProps) {
 
   const renderNode = (node: RoadmapNode, depth: number): ReactNode => {
     const isEditing = editingId === node.id;
+    const siblings = siblingsOf(node);
+    const siblingIndex = siblings.findIndex((n) => n.id === node.id);
     return (
       <div key={node.id} style={{ marginLeft: depth * 14 }}>
         <div className="group flex items-center justify-between gap-2 py-1">
@@ -76,6 +80,22 @@ export function RoadmapWidget({ widgetId, topGoalId }: RoadmapWidgetProps) {
             </span>
           )}
           <div className="flex items-center gap-2 opacity-0 transition group-hover:opacity-100">
+            <button
+              onClick={() => moveRoadmapNode(node.id, 'up')}
+              disabled={siblingIndex === 0}
+              aria-label={dict.common.moveUp}
+              className="text-faint hover:text-accent disabled:pointer-events-none disabled:opacity-30"
+            >
+              <ChevronUp size={13} />
+            </button>
+            <button
+              onClick={() => moveRoadmapNode(node.id, 'down')}
+              disabled={siblingIndex === siblings.length - 1}
+              aria-label={dict.common.moveDown}
+              className="text-faint hover:text-accent disabled:pointer-events-none disabled:opacity-30"
+            >
+              <ChevronDown size={13} />
+            </button>
             <button
               onClick={() => startEdit(node)}
               aria-label={dict.common.edit}

@@ -104,6 +104,8 @@ const ko = {
     delete: '삭제',
     cancel: '취소',
     confirm: '확인',
+    moveUp: '위로 이동',
+    moveDown: '아래로 이동',
   },
   confirm: {
     openTitle: '파일 열기',

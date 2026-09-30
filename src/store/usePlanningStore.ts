@@ -30,6 +30,19 @@ function nextPlacement() {
   return { x: 40 + placementCounter * 32, y: 40 + placementCounter * 32 };
 }
 
+type MoveDirection = 'up' | 'down';
+
+// 목록 안에서 id로 항목을 찾아 바로 앞/뒤 항목과 자리를 바꾼다.
+// 이미 맨 위/아래라 바꿀 수 없으면 원래 배열을 그대로 돌려준다(참조 비교로 변경 여부 판단 가능).
+function moveById<T extends { id: string }>(list: T[], id: string, direction: MoveDirection): T[] {
+  const idx = list.findIndex((item) => item.id === id);
+  const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+  if (idx < 0 || swapIdx < 0 || swapIdx >= list.length) return list;
+  const next = [...list];
+  [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+  return next;
+}
+
 interface PlanningState {
   lifeLines: LifeLineItem[];
   topGoals: TopGoal[];
@@ -41,16 +54,23 @@ interface PlanningState {
   widgets: CanvasWidget[];
 
   addLifeLine: (title: string) => void;
+  updateLifeLine: (id: string, title: string) => void;
+  moveLifeLine: (id: string, direction: MoveDirection) => void;
   deleteLifeLine: (id: string) => void;
 
   addTopGoal: (title: string) => void;
+  updateTopGoal: (id: string, title: string) => void;
+  moveTopGoal: (id: string, direction: MoveDirection) => void;
   deleteTopGoal: (id: string) => void;
 
   addRoadmapNode: (topGoalId: string, parentId: string | null, title: string) => void;
   updateRoadmapNode: (id: string, title: string) => void;
+  moveRoadmapNode: (id: string, direction: MoveDirection) => void;
   deleteRoadmapNode: (id: string) => void;
 
   addWeeklyGoal: (weekId: string, title: string, roadmapNodeId?: string | null) => void;
+  updateWeeklyGoal: (id: string, title: string) => void;
+  moveWeeklyGoal: (id: string, direction: MoveDirection) => void;
   toggleWeeklyGoalDone: (id: string) => void;
   deleteWeeklyGoal: (id: string) => void;
 
@@ -95,6 +115,10 @@ export const usePlanningStore = create<PlanningState>()((set, get) => ({
         set((s) => ({
           lifeLines: [...s.lifeLines, { id: createId(), title, createdAt: Date.now() }],
         })),
+      updateLifeLine: (id, title) =>
+        set((s) => ({ lifeLines: s.lifeLines.map((l) => (l.id === id ? { ...l, title } : l)) })),
+      moveLifeLine: (id, direction) =>
+        set((s) => ({ lifeLines: moveById(s.lifeLines, id, direction) })),
       deleteLifeLine: (id) =>
         set((s) => ({ lifeLines: s.lifeLines.filter((l) => l.id !== id) })),
 
@@ -102,6 +126,10 @@ export const usePlanningStore = create<PlanningState>()((set, get) => ({
         set((s) => ({
           topGoals: [...s.topGoals, { id: createId(), title, createdAt: Date.now() }],
         })),
+      updateTopGoal: (id, title) =>
+        set((s) => ({ topGoals: s.topGoals.map((g) => (g.id === id ? { ...g, title } : g)) })),
+      moveTopGoal: (id, direction) =>
+        set((s) => ({ topGoals: moveById(s.topGoals, id, direction) })),
       deleteTopGoal: (id) =>
         set((s) => ({
           topGoals: s.topGoals.filter((g) => g.id !== id),
@@ -119,6 +147,26 @@ export const usePlanningStore = create<PlanningState>()((set, get) => ({
         set((s) => ({
           roadmapNodes: s.roadmapNodes.map((n) => (n.id === id ? { ...n, title } : n)),
         })),
+      // 같은 부모(형제) 안에서만 순서를 바꾼다. moveWeeklyGoal과 같은 방식으로
+      // 형제끼리만 뽑아 순서를 바꾼 뒤 원래 있던 자리에 다시 끼워 넣는다.
+      moveRoadmapNode: (id, direction) =>
+        set((s) => {
+          const node = s.roadmapNodes.find((n) => n.id === id);
+          if (!node) return {};
+          const siblings = s.roadmapNodes.filter(
+            (n) => n.topGoalId === node.topGoalId && n.parentId === node.parentId
+          );
+          const reordered = moveById(siblings, id, direction);
+          if (reordered === siblings) return {};
+          let i = 0;
+          return {
+            roadmapNodes: s.roadmapNodes.map((n) =>
+              n.topGoalId === node.topGoalId && n.parentId === node.parentId
+                ? reordered[i++]
+                : n
+            ),
+          };
+        }),
       deleteRoadmapNode: (id) =>
         set((s) => {
           const toDelete = new Set([id]);
@@ -142,6 +190,24 @@ export const usePlanningStore = create<PlanningState>()((set, get) => ({
             { id: createId(), weekId, title, roadmapNodeId, done: false, createdAt: Date.now() },
           ],
         })),
+      updateWeeklyGoal: (id, title) =>
+        set((s) => ({
+          weeklyGoals: s.weeklyGoals.map((g) => (g.id === id ? { ...g, title } : g)),
+        })),
+      // weeklyGoals는 모든 주의 항목을 한 배열에 같이 담고 있어서, 같은 주 항목끼리만
+      // 뽑아 순서를 바꾼 뒤 원래 자리(그 주 항목이 있던 인덱스들)에 다시 끼워 넣는다.
+      moveWeeklyGoal: (id, direction) =>
+        set((s) => {
+          const goal = s.weeklyGoals.find((g) => g.id === id);
+          if (!goal) return {};
+          const sameWeek = s.weeklyGoals.filter((g) => g.weekId === goal.weekId);
+          const reordered = moveById(sameWeek, id, direction);
+          if (reordered === sameWeek) return {};
+          let i = 0;
+          return {
+            weeklyGoals: s.weeklyGoals.map((g) => (g.weekId === goal.weekId ? reordered[i++] : g)),
+          };
+        }),
       toggleWeeklyGoalDone: (id) =>
         set((s) => ({
           weeklyGoals: s.weeklyGoals.map((g) => (g.id === id ? { ...g, done: !g.done } : g)),
