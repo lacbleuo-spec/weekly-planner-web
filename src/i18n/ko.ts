@@ -100,6 +100,7 @@ const ko = {
   },
   common: {
     add: '추가',
+    edit: '수정',
     delete: '삭제',
     cancel: '취소',
     confirm: '확인',

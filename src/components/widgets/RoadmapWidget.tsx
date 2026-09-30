@@ -1,5 +1,5 @@
-import { Plus, X } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { Pencil, Plus, X } from 'lucide-react';
+import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 import { useDict } from '../../i18n';
 import { usePlanningStore } from '../../store/usePlanningStore';
@@ -16,9 +16,12 @@ export function RoadmapWidget({ widgetId, topGoalId }: RoadmapWidgetProps) {
   const topGoals = usePlanningStore((s) => s.topGoals);
   const roadmapNodes = usePlanningStore((s) => s.roadmapNodes);
   const addRoadmapNode = usePlanningStore((s) => s.addRoadmapNode);
+  const updateRoadmapNode = usePlanningStore((s) => s.updateRoadmapNode);
   const deleteRoadmapNode = usePlanningStore((s) => s.deleteRoadmapNode);
   const setWidgetConfig = usePlanningStore((s) => s.setWidgetConfig);
   const [addingParent, setAddingParent] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   const selectedGoalId = topGoalId ?? topGoals[0]?.id ?? null;
 
@@ -33,15 +36,53 @@ export function RoadmapWidget({ widgetId, topGoalId }: RoadmapWidgetProps) {
     return <p className="text-[13px] text-faint">{dict.widgets.roadmap.needTopGoal}</p>;
   }
 
+  const startEdit = (node: RoadmapNode) => {
+    setEditingId(node.id);
+    setEditValue(node.title);
+  };
+
+  const commitEdit = () => {
+    const trimmed = editValue.trim();
+    if (editingId && trimmed) {
+      updateRoadmapNode(editingId, trimmed);
+    }
+    setEditingId(null);
+  };
+
+  const onEditKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') commitEdit();
+    if (e.key === 'Escape') setEditingId(null);
+  };
+
   const renderNode = (node: RoadmapNode, depth: number): ReactNode => {
+    const isEditing = editingId === node.id;
     return (
       <div key={node.id} style={{ marginLeft: depth * 14 }}>
         <div className="group flex items-center justify-between gap-2 py-1">
-          <span className="flex-1 text-[13px] text-ink">
-            {depth > 0 ? '· ' : ''}
-            {node.title}
-          </span>
+          {isEditing ? (
+            <input
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={onEditKeyDown}
+              onBlur={commitEdit}
+              autoFocus
+              onFocus={(e) => e.target.select()}
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-ink focus:outline-none"
+            />
+          ) : (
+            <span className="flex-1 text-[13px] text-ink">
+              {depth > 0 ? '· ' : ''}
+              {node.title}
+            </span>
+          )}
           <div className="flex items-center gap-2 opacity-0 transition group-hover:opacity-100">
+            <button
+              onClick={() => startEdit(node)}
+              aria-label={dict.common.edit}
+              className="text-faint hover:text-accent"
+            >
+              <Pencil size={13} />
+            </button>
             <button
               onClick={() => setAddingParent(node.id)}
               aria-label={dict.widgets.roadmap.addChild}
@@ -58,16 +99,18 @@ export function RoadmapWidget({ widgetId, topGoalId }: RoadmapWidgetProps) {
             </button>
           </div>
         </div>
-        {addingParent === node.id && (
-          <AddRow
-            placeholder={dict.widgets.roadmap.addChildPlaceholder}
-            onSubmit={(title) => {
-              addRoadmapNode(selectedGoalId as string, node.id, title);
-              setAddingParent(null);
-            }}
-          />
-        )}
         {childrenOf(node.id).map((child) => renderNode(child, depth + 1))}
+        {addingParent === node.id && (
+          <div style={{ marginLeft: (depth + 1) * 14 }}>
+            <AddRow
+              placeholder={dict.widgets.roadmap.addChildPlaceholder}
+              onSubmit={(title) => {
+                addRoadmapNode(selectedGoalId as string, node.id, title);
+                setAddingParent(null);
+              }}
+            />
+          </div>
+        )}
       </div>
     );
   };

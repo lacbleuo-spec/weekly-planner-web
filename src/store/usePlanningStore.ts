@@ -47,6 +47,7 @@ interface PlanningState {
   deleteTopGoal: (id: string) => void;
 
   addRoadmapNode: (topGoalId: string, parentId: string | null, title: string) => void;
+  updateRoadmapNode: (id: string, title: string) => void;
   deleteRoadmapNode: (id: string) => void;
 
   addWeeklyGoal: (weekId: string, title: string, roadmapNodeId?: string | null) => void;
@@ -113,6 +114,10 @@ export const usePlanningStore = create<PlanningState>()((set, get) => ({
             ...s.roadmapNodes,
             { id: createId(), topGoalId, parentId, title, createdAt: Date.now() },
           ],
+        })),
+      updateRoadmapNode: (id, title) =>
+        set((s) => ({
+          roadmapNodes: s.roadmapNodes.map((n) => (n.id === id ? { ...n, title } : n)),
         })),
       deleteRoadmapNode: (id) =>
         set((s) => {
