@@ -43,6 +43,13 @@ function getShowSaveFilePicker() {
   ).showSaveFilePicker;
 }
 
+// 저장 위치를 직접 고를 수 있는 브라우저인지: 데스크톱 Chrome/Edge 정도만 해당하고,
+// 모바일 브라우저와 Safari는 지원하지 않는다. 지원하지 않으면 파일명을 우리 UI에서
+// 직접 물어본 뒤 다운로드로 대체해야 한다(그러지 않으면 이름을 고칠 방법이 없다).
+export function canPickSaveLocation(): boolean {
+  return !!getShowSaveFilePicker();
+}
+
 function getShowOpenFilePicker() {
   return (
     window as unknown as {
@@ -92,10 +99,16 @@ function pickFileViaInput(): Promise<File | null> {
     input.accept = 'application/json,.json';
     // 일부 브라우저는 문서에 붙어있지 않은 input에서는 click()이 대화상자를
     // 열지 않는다(클릭이 조용히 무시되어 아무 반응 없이 멈춘 것처럼 보인다).
-    // 화면에는 보이지 않게 두되 반드시 문서에 붙여둔다.
+    // iOS Safari(와 iOS의 다른 브라우저들, 전부 같은 WebKit 엔진)는 한 술 더 떠서
+    // 화면 밖으로 멀리 빼둔(top/left: -1000px) input에서는 아예 선택 시트가 뜨지
+    // 않는다. 문서에 붙이되 화면 안(왼쪽 위 1px)에 두고 투명하게만 감춘다.
     input.style.position = 'fixed';
-    input.style.top = '-1000px';
-    input.style.left = '-1000px';
+    input.style.top = '0';
+    input.style.left = '0';
+    input.style.width = '1px';
+    input.style.height = '1px';
+    input.style.opacity = '0';
+    input.style.pointerEvents = 'none';
     document.body.appendChild(input);
 
     let settled = false;
@@ -177,16 +190,21 @@ export interface SavedFile {
 }
 
 // 다른 이름으로 저장: 항상 새로 위치를 고른다(위치를 고를 수 없는 브라우저는 다운로드로 대체).
+// preferredName을 주면 그 이름을 기본값으로 제안한다 — 이미 열려있던 파일을 다시
+// 저장할 때 같은 이름이 뜨게 해서, 위치 선택 API가 없는 브라우저에서도 사용자가
+// 다운로드 대화상자에서 기존 파일을 "바꾸기"로 고르기 쉽게 한다.
 export async function saveSnapshotAs(
-  snapshot: PlanningSnapshot
+  snapshot: PlanningSnapshot,
+  preferredName?: string
 ): Promise<SavedFile | 'cancelled'> {
   const json = JSON.stringify(snapshot, null, 2);
+  const suggestedName = preferredName ?? defaultFileName();
   const showSaveFilePicker = getShowSaveFilePicker();
 
   if (showSaveFilePicker) {
     try {
       const handle = await showSaveFilePicker({
-        suggestedName: defaultFileName(),
+        suggestedName,
         types: FILE_TYPES,
       });
       const writable = await handle.createWritable();
@@ -200,7 +218,6 @@ export async function saveSnapshotAs(
     }
   }
 
-  const fileName = defaultFileName();
-  downloadAsFile(json, fileName);
-  return { handle: null, fileName };
+  downloadAsFile(json, suggestedName);
+  return { handle: null, fileName: suggestedName };
 }

@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import { useDict } from '../../i18n';
 import {
+  canPickSaveLocation,
   openSnapshotFile,
   saveSnapshotAs,
   writeSnapshotToHandle,
@@ -11,6 +12,7 @@ import {
 } from '../../services/fileStorage';
 import { usePlanningStore } from '../../store/usePlanningStore';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { PromptDialog } from '../ui/PromptDialog';
 import { Toast } from '../ui/Toast';
 import { useToast } from '../ui/useToast';
 
@@ -40,6 +42,7 @@ export function TopBar() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [pendingOpen, setPendingOpen] = useState<OpenedFile | null>(null);
   const [pendingNew, setPendingNew] = useState(false);
+  const [nameToSave, setNameToSave] = useState<string | null>(null);
   const { message, showToast } = useToast();
 
   const applyNewFile = (result: { handle: FileSystemFileHandle | null; fileName: string }) => {
@@ -86,32 +89,13 @@ export function TopBar() {
     setPendingOpen(null);
   };
 
-  const runSave = async () => {
-    setMenuOpen(false);
+  // 저장 위치를 직접 고를 수 있는 브라우저는 그 대화상자 안에서 이름도 같이 정하지만,
+  // 그럴 수 없는 브라우저(모바일, Safari)는 대화상자 자체가 없어 이름을 고칠 방법이
+  // 없으므로 우리 UI에서 먼저 이름을 물어본 뒤 그 이름으로 다운로드한다.
+  const doSaveAs = async (preferredName?: string) => {
     setBusy(true);
     try {
-      if (handle) {
-        await writeSnapshotToHandle(handle, getSnapshot());
-        showToast(dict.alerts.saveDoneMessage);
-      } else {
-        const result = await saveSnapshotAs(getSnapshot());
-        if (result !== 'cancelled') {
-          applyNewFile(result);
-          showToast(dict.alerts.saveDoneMessage);
-        }
-      }
-    } catch {
-      showToast(dict.alerts.saveFailTitle);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const runSaveAs = async () => {
-    setMenuOpen(false);
-    setBusy(true);
-    try {
-      const result = await saveSnapshotAs(getSnapshot());
+      const result = await saveSnapshotAs(getSnapshot(), preferredName);
       if (result !== 'cancelled') {
         applyNewFile(result);
         showToast(dict.alerts.saveDoneMessage);
@@ -121,6 +105,42 @@ export function TopBar() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const runSave = async () => {
+    setMenuOpen(false);
+    if (handle) {
+      setBusy(true);
+      try {
+        await writeSnapshotToHandle(handle, getSnapshot());
+        showToast(dict.alerts.saveDoneMessage);
+      } catch {
+        showToast(dict.alerts.saveFailTitle);
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    if (canPickSaveLocation()) {
+      await doSaveAs(fileName ?? undefined);
+      return;
+    }
+    setNameToSave(fileName ? fileName.replace(/\.json$/i, '') : '무제');
+  };
+
+  const runSaveAs = async () => {
+    setMenuOpen(false);
+    if (canPickSaveLocation()) {
+      await doSaveAs(fileName ?? undefined);
+      return;
+    }
+    setNameToSave(fileName ? fileName.replace(/\.json$/i, '') : '무제');
+  };
+
+  const confirmNameToSave = () => {
+    const base = (nameToSave ?? '').trim() || '무제';
+    setNameToSave(null);
+    void doSaveAs(`${base}.json`);
   };
 
   return (
@@ -193,6 +213,15 @@ export function TopBar() {
         confirmLabel={dict.confirm.newConfirm}
         onConfirm={doNew}
         onCancel={() => setPendingNew(false)}
+      />
+      <PromptDialog
+        open={nameToSave !== null}
+        title={dict.saveAsPrompt.title}
+        value={nameToSave ?? ''}
+        onChange={setNameToSave}
+        confirmLabel={dict.saveAsPrompt.confirm}
+        onConfirm={confirmNameToSave}
+        onCancel={() => setNameToSave(null)}
       />
       <Toast message={message} />
     </div>

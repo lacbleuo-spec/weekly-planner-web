@@ -112,6 +112,10 @@ const ko = {
     newMessage: '지금 캔버스를 비웁니다. 저장하지 않은 내용은 사라져요. 계속할까요?',
     newConfirm: '새로 만들기',
   },
+  saveAsPrompt: {
+    title: '파일 이름',
+    confirm: '저장',
+  },
   alerts: {
     saveDoneMessage: '저장했어요.',
     saveFailTitle: '저장에 실패했어요.',
