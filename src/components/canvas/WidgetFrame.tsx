@@ -141,9 +141,13 @@ export function WidgetFrame({
           <div className="absolute -left-1.5 top-4 h-3 w-3 rotate-45 bg-surface" />
           <div className="relative text-[13px] leading-5 text-ink">
             <p className="font-bold">{guideTitle}</p>
-            <p className="mt-1.5 whitespace-pre-line">{guideBody}</p>
-            <p className="mt-3 font-bold">{guideExampleLabel}</p>
-            <p className="mt-1 whitespace-pre-line">{guideExample}</p>
+            {guideBody && <p className="mt-1.5 whitespace-pre-line">{guideBody}</p>}
+            {guideExample && (
+              <>
+                <p className="mt-3 font-bold">{guideExampleLabel}</p>
+                <p className="mt-1 whitespace-pre-line">{guideExample}</p>
+              </>
+            )}
           </div>
         </div>
       )}

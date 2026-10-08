@@ -1,5 +1,5 @@
 import { ChevronDown, Copy, FilePlus2, FolderOpen, Save } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useDict } from '../../i18n';
 import {
@@ -142,6 +142,23 @@ export function TopBar() {
     setNameToSave(null);
     void doSaveAs(`${base}.json`);
   };
+
+  // Cmd/Ctrl+S 저장, Cmd/Ctrl+Shift+S 다른 이름으로 저장.
+  // preventDefault를 안 하면 브라우저 자체의 "페이지 저장" 대화상자가 같이 뜬다.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's') return;
+      e.preventDefault();
+      if (busy || pendingOpen || pendingNew || nameToSave !== null) return;
+      if (e.shiftKey) {
+        void runSaveAs();
+      } else {
+        void runSave();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  });
 
   return (
     <div className="flex shrink-0 items-center justify-between border-b border-line bg-surface px-5 py-3.5">
