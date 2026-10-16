@@ -18,6 +18,7 @@ import {
   startOfMonth,
 } from '../../lib/date';
 import { PALETTE } from '../../lib/palette';
+import { AlarmPanel } from '../ui/AlarmPanel';
 import { DatePanel } from '../ui/DatePanel';
 import { TimePanel } from '../ui/TimePanel';
 import { usePlanningStore } from '../../store/usePlanningStore';
@@ -94,7 +95,7 @@ function timeLabelFor(
   return allDayText;
 }
 
-type PickerKey = 'startDate' | 'startTime' | 'endDate' | 'endTime';
+type PickerKey = 'startDate' | 'startTime' | 'endDate' | 'endTime' | 'alarm';
 
 // 아이폰 일정 편집의 날짜/시간 칩. 눌러서 아래 선택 패널을 펼치면 강조색으로 보인다.
 function Pill({
@@ -417,20 +418,23 @@ export function WeeklyTimelineWidget() {
               )}
             </div>
             {rangeError && <p className="pt-1 text-[11.5px] text-danger">{t.rangeError}</p>}
-            <label className="flex items-center justify-between pt-3 text-[12.5px] text-subink">
-              {t.alarmLabel}
-              <select
-                value={alarmKey}
-                onChange={(e) => setAlarmKey(e.target.value)}
-                className="rounded-control border border-line bg-canvas px-1.5 py-1 text-[12px] text-ink"
-              >
-                {ALARM_OPTIONS.map((o) => (
-                  <option key={o.key} value={o.key}>
-                    {alarmLabel(t, o.key)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="pt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[12.5px] text-subink">{t.alarmLabel}</span>
+                <Pill active={picker === 'alarm'} onClick={() => togglePicker('alarm')}>
+                  {alarmLabel(t, alarmKey)}
+                </Pill>
+              </div>
+              {picker === 'alarm' && (
+                <div ref={panelRef}>
+                  <AlarmPanel
+                    value={alarmKey}
+                    onChange={setAlarmKey}
+                    options={ALARM_OPTIONS.map((o) => ({ key: o.key, label: alarmLabel(t, o.key) }))}
+                  />
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex shrink-0 gap-1.5 pt-2">
             <button
