@@ -1,7 +1,8 @@
-import { ChevronDown, Copy, FilePlus2, FolderOpen, Save } from 'lucide-react';
+import { ChevronDown, Copy, FilePlus2, FolderOpen, Info, Save } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { useDict } from '../../i18n';
+import { useDict, useLocale } from '../../i18n';
+import { isLocale } from '../../i18n/locale';
 import {
   canPickSaveLocation,
   openSnapshotFile,
@@ -11,20 +12,21 @@ import {
   type OpenedFile,
 } from '../../services/fileStorage';
 import { usePlanningStore } from '../../store/usePlanningStore';
+import { AboutDialog } from '../ui/AboutDialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { PromptDialog } from '../ui/PromptDialog';
 import { Toast } from '../ui/Toast';
 import { useToast } from '../ui/useToast';
+import { LanguageMenu } from './LanguageMenu';
 
 function emptySnapshot() {
   return {
     lifeLines: [],
     topGoals: [],
     roadmapNodes: [],
-    weeklyGoals: [],
+    dailyGoals: [],
     events: [],
     routineBlocks: [],
-    dailyAssignments: [],
     widgets: [],
     updatedAt: Date.now(),
   };
@@ -32,11 +34,13 @@ function emptySnapshot() {
 
 export function TopBar() {
   const dict = useDict();
+  const { locale, setLocale } = useLocale();
   const widgets = usePlanningStore((s) => s.widgets);
   const getSnapshot = usePlanningStore((s) => s.getSnapshot);
   const loadSnapshot = usePlanningStore((s) => s.loadSnapshot);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [handle, setHandle] = useState<FileSystemFileHandle | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -44,6 +48,8 @@ export function TopBar() {
   const [pendingNew, setPendingNew] = useState(false);
   const [nameToSave, setNameToSave] = useState<string | null>(null);
   const { message, showToast } = useToast();
+
+  const currentSnapshot = () => ({ ...getSnapshot(), locale });
 
   const applyNewFile = (result: { handle: FileSystemFileHandle | null; fileName: string }) => {
     setHandle(result.handle);
@@ -70,7 +76,7 @@ export function TopBar() {
     setMenuOpen(false);
     setBusy(true);
     try {
-      const opened = await openSnapshotFile();
+      const opened = await openSnapshotFile(dict.file);
       if (opened) setPendingOpen(opened);
     } catch {
       showToast(dict.alerts.openInvalidFileMessage);
@@ -82,6 +88,8 @@ export function TopBar() {
   const confirmOpen = () => {
     if (pendingOpen) {
       loadSnapshot(pendingOpen.snapshot);
+      // 파일에 언어가 적혀 있으면 그 언어로 맞춘다(예전 파일은 지금 언어를 그대로 둔다).
+      if (isLocale(pendingOpen.snapshot.locale)) setLocale(pendingOpen.snapshot.locale);
       setHandle(pendingOpen.handle);
       setFileName(pendingOpen.fileName);
       showToast(dict.alerts.openDoneMessage);
@@ -95,7 +103,7 @@ export function TopBar() {
   const doSaveAs = async (preferredName?: string) => {
     setBusy(true);
     try {
-      const result = await saveSnapshotAs(getSnapshot(), preferredName);
+      const result = await saveSnapshotAs(currentSnapshot(), dict.file, preferredName);
       if (result !== 'cancelled') {
         applyNewFile(result);
         showToast(dict.alerts.saveDoneMessage);
@@ -112,7 +120,7 @@ export function TopBar() {
     if (handle) {
       setBusy(true);
       try {
-        await writeSnapshotToHandle(handle, getSnapshot());
+        await writeSnapshotToHandle(handle, currentSnapshot());
         showToast(dict.alerts.saveDoneMessage);
       } catch {
         showToast(dict.alerts.saveFailTitle);
@@ -125,7 +133,7 @@ export function TopBar() {
       await doSaveAs(fileName ?? undefined);
       return;
     }
-    setNameToSave(fileName ? fileName.replace(/\.json$/i, '') : '무제');
+    setNameToSave(fileName ? fileName.replace(/\.json$/i, '') : dict.file.defaultName);
   };
 
   const runSaveAs = async () => {
@@ -134,11 +142,11 @@ export function TopBar() {
       await doSaveAs(fileName ?? undefined);
       return;
     }
-    setNameToSave(fileName ? fileName.replace(/\.json$/i, '') : '무제');
+    setNameToSave(fileName ? fileName.replace(/\.json$/i, '') : dict.file.defaultName);
   };
 
   const confirmNameToSave = () => {
-    const base = (nameToSave ?? '').trim() || '무제';
+    const base = (nameToSave ?? '').trim() || dict.file.defaultName;
     setNameToSave(null);
     void doSaveAs(`${base}.json`);
   };
@@ -162,59 +170,73 @@ export function TopBar() {
 
   return (
     <div className="flex shrink-0 items-center justify-between border-b border-line bg-surface px-5 py-3.5">
-      <h1 className="flex items-baseline gap-2 text-[17px] font-bold text-ink">
+      <h1 className="flex min-w-0 items-baseline gap-2 text-[17px] font-bold text-ink">
         {dict.app.title}
         {fileName && (
           <span className="truncate text-[13px] font-medium text-faint">{fileName}</span>
         )}
       </h1>
 
-      <div className="relative">
-        {menuOpen && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-            <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-card bg-surface py-2 shadow-float">
-              <button
-                onClick={runNew}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-canvas"
-              >
-                <FilePlus2 size={16} className="text-subink" />
-                <span className="text-[14px] font-medium text-ink">{dict.topbar.new}</span>
-              </button>
-              <button
-                onClick={runOpen}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-canvas"
-              >
-                <FolderOpen size={16} className="text-subink" />
-                <span className="text-[14px] font-medium text-ink">{dict.topbar.open}</span>
-              </button>
-              <button
-                onClick={runSave}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-canvas"
-              >
-                <Save size={16} className="text-subink" />
-                <span className="text-[14px] font-medium text-ink">{dict.topbar.save}</span>
-              </button>
-              <button
-                onClick={runSaveAs}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-canvas"
-              >
-                <Copy size={16} className="text-subink" />
-                <span className="text-[14px] font-medium text-ink">{dict.topbar.saveAs}</span>
-              </button>
-            </div>
-          </>
-        )}
+      <div className="flex shrink-0 items-center gap-1">
         <button
-          disabled={busy}
-          onClick={() => setMenuOpen((v) => !v)}
-          className="flex items-center gap-1.5 rounded-control px-3 py-2 text-[14px] font-medium text-subink transition hover:bg-canvas disabled:opacity-50"
+          onClick={() => setAboutOpen(true)}
+          aria-label={dict.about.open}
+          className="flex items-center gap-1.5 rounded-control px-3 py-2 text-[14px] font-medium text-subink transition hover:bg-canvas"
         >
-          {dict.topbar.file}
-          <ChevronDown size={14} className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+          <Info size={15} />
+          <span className="hidden sm:inline">{dict.about.open}</span>
         </button>
+
+        <LanguageMenu />
+
+        <div className="relative">
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-card bg-surface py-2 shadow-float">
+                <button
+                  onClick={runNew}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-canvas"
+                >
+                  <FilePlus2 size={16} className="text-subink" />
+                  <span className="text-[14px] font-medium text-ink">{dict.topbar.new}</span>
+                </button>
+                <button
+                  onClick={runOpen}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-canvas"
+                >
+                  <FolderOpen size={16} className="text-subink" />
+                  <span className="text-[14px] font-medium text-ink">{dict.topbar.open}</span>
+                </button>
+                <button
+                  onClick={runSave}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-canvas"
+                >
+                  <Save size={16} className="text-subink" />
+                  <span className="text-[14px] font-medium text-ink">{dict.topbar.save}</span>
+                </button>
+                <button
+                  onClick={runSaveAs}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-canvas"
+                >
+                  <Copy size={16} className="text-subink" />
+                  <span className="text-[14px] font-medium text-ink">{dict.topbar.saveAs}</span>
+                </button>
+              </div>
+            </>
+          )}
+          <button
+            disabled={busy}
+            onClick={() => setMenuOpen((v) => !v)}
+            className="flex items-center gap-1.5 rounded-control px-3 py-2 text-[14px] font-medium text-subink transition hover:bg-canvas disabled:opacity-50"
+          >
+            {dict.topbar.file}
+            <ChevronDown size={14} className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
       </div>
 
+      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <ConfirmDialog
         open={pendingOpen !== null}
         title={dict.confirm.openTitle}

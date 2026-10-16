@@ -8,12 +8,15 @@ import {
   addMonths,
   formatDate,
   formatDateLabel,
+  formatMonthLabel,
   formatTime12,
   isSameDay,
   startOfDay,
   startOfMonth,
 } from '../../lib/date';
 import { PALETTE } from '../../lib/palette';
+import { DateSelect } from '../ui/DateSelect';
+import { TimeSelect } from '../ui/TimeSelect';
 import { usePlanningStore } from '../../store/usePlanningStore';
 import type { CalendarEvent } from '../../types/planning';
 
@@ -69,24 +72,30 @@ function eventsOnDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
 
 // 시작일과 종료일이 다른 이벤트는, 보고 있는 날짜가 시작일인지 종료일인지에 따라
 // 그날 해당하는 시각만 보여준다 (시작일엔 시작 시각, 종료일엔 종료 시각).
-function timeLabelFor(e: CalendarEvent, day: Date, allDayText: string): string {
+function timeLabelFor(
+  e: CalendarEvent,
+  day: Date,
+  allDayText: string,
+  strings: Dictionary['date']
+): string {
   if (e.allDay) return allDayText;
   const dayStartMs = startOfDay(day).getTime();
   const dayEndMs = addDays(startOfDay(day), 1).getTime();
   const startsToday = e.startAt >= dayStartMs && e.startAt < dayEndMs;
   const endsToday = e.endAt > dayStartMs && e.endAt <= dayEndMs;
   if (startsToday && endsToday) {
-    return `${formatTime12(new Date(e.startAt))} - ${formatTime12(new Date(e.endAt))}`;
+    return `${formatTime12(new Date(e.startAt), strings)} - ${formatTime12(new Date(e.endAt), strings)}`;
   }
-  if (startsToday) return `${formatTime12(new Date(e.startAt))} →`;
-  if (endsToday) return `→ ${formatTime12(new Date(e.endAt))}`;
+  if (startsToday) return `${formatTime12(new Date(e.startAt), strings)} →`;
+  if (endsToday) return `→ ${formatTime12(new Date(e.endAt), strings)}`;
   return allDayText;
 }
 
 // 아이폰 캘린더처럼 항상 6주(42칸)를 채우되, 마지막 줄이 전부 다음 달이면 생략한다.
+// 위크보드의 한 주는 월요일에 시작한다.
 function buildMonthGrid(viewMonth: Date): Date[] {
   const first = startOfMonth(viewMonth);
-  const gridStart = addDays(first, -first.getDay());
+  const gridStart = addDays(first, -((first.getDay() + 6) % 7));
   const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
   const lastRow = days.slice(35, 42);
   if (lastRow.every((d) => d.getMonth() !== viewMonth.getMonth())) {
@@ -171,19 +180,27 @@ export function WeeklyTimelineWidget() {
   return (
     <div className="flex h-full flex-col">
       <div className="mb-1.5 flex shrink-0 items-center justify-between">
-        <button onClick={() => shiftMonth(-1)} className="text-subink hover:text-accent">
+        <button
+          onClick={() => shiftMonth(-1)}
+          aria-label={dict.date.prevMonth}
+          className="text-subink hover:text-accent"
+        >
           <ChevronLeft size={16} />
         </button>
         <button onClick={goToday} className="text-[13px] font-semibold text-ink">
-          {viewMonth.getFullYear()}년 {viewMonth.getMonth() + 1}월
+          {formatMonthLabel(viewMonth, dict.date)}
         </button>
-        <button onClick={() => shiftMonth(1)} className="text-subink hover:text-accent">
+        <button
+          onClick={() => shiftMonth(1)}
+          aria-label={dict.date.nextMonth}
+          className="text-subink hover:text-accent"
+        >
           <ChevronRight size={16} />
         </button>
       </div>
 
       <div className="mb-1 grid shrink-0 grid-cols-7 text-center">
-        {dict.date.weekdaysShort.map((w, i) => (
+        {dict.date.weekdaysMonFirst.map((w, i) => (
           <span key={i} className="text-[10px] text-faint">
             {w}
           </span>
@@ -197,7 +214,12 @@ export function WeeklyTimelineWidget() {
           const isToday = isSameDay(d, new Date());
           const dots = eventsOnDay(events, d).slice(0, 3);
           return (
-            <button key={i} onClick={() => selectDay(d)} className="flex flex-col items-center gap-0.5 py-0.5">
+            <button
+              key={i}
+              onClick={() => selectDay(d)}
+              aria-label={formatDateLabel(d, dict.date)}
+              className="flex flex-col items-center gap-0.5 py-0.5"
+            >
               <span
                 className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] transition ${
                   isSelected
@@ -240,50 +262,52 @@ export function WeeklyTimelineWidget() {
                 className="h-4 w-4 accent-accent"
               />
             </label>
-            <div className="flex items-center gap-1.5 text-[12px] text-subink">
-              <span className="w-9 shrink-0">{t.startsLabel}</span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value);
-                  setRangeError(false);
-                }}
-                className={`shrink-0 rounded-control border border-line bg-canvas px-1.5 py-1 text-[12px] text-ink ${allDay ? 'flex-1' : 'w-[128px]'}`}
-              />
-              {!allDay && (
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => {
-                    setStartTime(e.target.value);
+            <div className="space-y-1 text-[12px] text-subink">
+              <div className="flex items-center gap-1.5">
+                <span className="w-9 shrink-0">{t.startsLabel}</span>
+                <DateSelect
+                  value={startDate}
+                  onChange={(v) => {
+                    setStartDate(v);
                     setRangeError(false);
                   }}
-                  className="min-w-0 flex-1 rounded-control border border-line bg-canvas px-1.5 py-1 text-[12px] text-ink"
                 />
+              </div>
+              {!allDay && (
+                <div className="pl-[42px]">
+                  <TimeSelect
+                    value={startTime}
+                    onChange={(v) => {
+                      setStartTime(v);
+                      setRangeError(false);
+                    }}
+                  />
+                </div>
               )}
             </div>
-            <div className="flex items-center gap-1.5 text-[12px] text-subink">
-              <span className="w-9 shrink-0">{t.endsLabel}</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => {
-                  setEndDate(e.target.value);
-                  setRangeError(false);
-                }}
-                className={`shrink-0 rounded-control border bg-canvas px-1.5 py-1 text-[12px] text-ink ${rangeError ? 'border-danger' : 'border-line'} ${allDay ? 'flex-1' : 'w-[128px]'}`}
-              />
-              {!allDay && (
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => {
-                    setEndTime(e.target.value);
+            <div className="space-y-1 text-[12px] text-subink">
+              <div className="flex items-center gap-1.5">
+                <span className="w-9 shrink-0">{t.endsLabel}</span>
+                <DateSelect
+                  value={endDate}
+                  invalid={rangeError}
+                  onChange={(v) => {
+                    setEndDate(v);
                     setRangeError(false);
                   }}
-                  className={`min-w-0 flex-1 rounded-control border bg-canvas px-1.5 py-1 text-[12px] text-ink ${rangeError ? 'border-danger' : 'border-line'}`}
                 />
+              </div>
+              {!allDay && (
+                <div className="pl-[42px]">
+                  <TimeSelect
+                    value={endTime}
+                    invalid={rangeError}
+                    onChange={(v) => {
+                      setEndTime(v);
+                      setRangeError(false);
+                    }}
+                  />
+                </div>
               )}
             </div>
             {rangeError && <p className="text-[11.5px] text-danger">{t.rangeError}</p>}
@@ -321,7 +345,7 @@ export function WeeklyTimelineWidget() {
         <>
           <div className="min-h-0 flex-1 overflow-y-auto border-t border-line pt-2">
             <p className="mb-1 text-[11px] font-medium text-faint">
-              {formatDateLabel(selectedDate, dict.date.weekdaysShort)}
+              {formatDateLabel(selectedDate, dict.date)}
             </p>
             {dayEvents.length === 0 ? (
               <p className="text-[12.5px] text-faint">{t.noEvents}</p>
@@ -332,7 +356,7 @@ export function WeeklyTimelineWidget() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px] text-ink">{e.title}</p>
                     <p className="flex items-center gap-1 text-[11px] text-faint">
-                      <span className="truncate">{timeLabelFor(e, selectedDate, t.allDay)}</span>
+                      <span className="truncate">{timeLabelFor(e, selectedDate, t.allDay, dict.date)}</span>
                       {e.alarmMinutesBefore !== null && <Bell size={10} className="shrink-0" />}
                     </p>
                   </div>

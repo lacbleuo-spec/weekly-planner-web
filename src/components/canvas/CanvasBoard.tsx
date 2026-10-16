@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { useDict } from '../../i18n';
+import { useDict, withWidgetNames } from '../../i18n';
 import { usePlanningStore } from '../../store/usePlanningStore';
 import { useCanvasFocusStore } from '../../store/useCanvasFocusStore';
 import { WIDGET_ICONS } from '../widgets/meta';
@@ -211,10 +211,10 @@ export function CanvasBoard() {
               guideOn={widget.guideVisible ?? true}
               onToggleGuide={() => toggleWidgetGuideVisible(widget.id)}
               guideToggleLabel={dict.widgetGuide.perWidgetToggleLabel}
-              guideTitle={dict.widgetGuide[widget.type].title}
-              guideBody={dict.widgetGuide[widget.type].body}
+              guideTitle={withWidgetNames(dict, dict.widgetGuide[widget.type].title)}
+              guideBody={withWidgetNames(dict, dict.widgetGuide[widget.type].body)}
               guideExampleLabel={dict.widgetGuide.exampleLabel}
-              guideExample={dict.widgetGuide[widget.type].example}
+              guideExample={withWidgetNames(dict, dict.widgetGuide[widget.type].example)}
             >
               <WidgetContent widget={widget} />
             </WidgetFrame>

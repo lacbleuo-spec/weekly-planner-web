@@ -1,7 +1,42 @@
-// 번역의 기준(소스) 언어. 이후 en.ts 등 같은 모양의 딕셔너리를 추가해 언어를 늘릴 수 있다.
+// 번역의 기준(소스) 언어. en.ts 같은 다른 언어는 이 모양(Dictionary)을 그대로 따른다.
+//
+// 문구 안의 {이름}은 코드에서 값으로 채워진다.
+// - 위젯 이름: {lifeLine} {topGoal} {roadmap} {dailyGoal} {timetable} {weeklyTimeline}
+// - 날짜/시간: {year} {month} {monthName} {day} {weekday} {period} {hour} {minute}
+interface AboutParagraph {
+  text: string;
+  emphasized?: boolean;
+}
+
+const aboutParagraphs: AboutParagraph[] = [
+  {
+    text: '완벽해 보였던 계획도 삶 속으로 들어오면 금방 흔들립니다.\n예상보다 일이 바빠지기도 하고, 몸이 생각보다 따라 주지 않기도 하고, 처음에는 중요해 보였던 일이 막상 해 보면 내 방향과 맞지 않을 수도 있습니다.',
+  },
+  { text: '그래서 계획은 현실과 만나면서 반드시 수정될 수밖에 없습니다.' },
+  {
+    text: '계획이 너무 복잡하게 연결되어 있으면, 작은 수정 하나가 전체를 흔드는 큰 사건처럼 느껴집니다. 오늘의 계획을 조금 바꾸고 싶을 뿐인데, 월 목표를 고쳐야 하고, 분기 목표를 다시 계산해야 하고 연간 목표의 흐름까지 손봐야 합니다.',
+  },
+  {
+    text: '그러다 보면 계획을 고치는 일 자체가 또 하나의 일이 됩니다.\n이 지점에서 많은 사람들이 지칩니다.',
+  },
+  { text: '좋은 계획은 나를 자주 다시 시작하게 해 주어야 합니다.', emphasized: true },
+  {
+    text: '만약 전체 흐름을 미리 그려 보고 싶다면, 월 목표나 분기 목표를 세우기보다 {roadmap}으로 방향과 아이디어를 자유롭게 펼쳐 보는 편이 훨씬 도움이 됩니다.',
+  },
+];
+
 const ko = {
   app: {
     title: '위크보드',
+  },
+  file: {
+    defaultName: '무제',
+    typeDescription: '위크보드 파일',
+  },
+  about: {
+    open: '소개',
+    title: '위크보드에는 왜 연간 목표, 분기 목표, 월 목표, 주간 목표가 없을까요?',
+    paragraphs: aboutParagraphs,
   },
   topbar: {
     file: '파일',
@@ -9,6 +44,7 @@ const ko = {
     open: '열기',
     save: '저장',
     saveAs: '다른 이름으로 저장',
+    language: '언어',
   },
   canvas: {
     emptyIntro: '위크보드는 목적, 목표, 루틴, 일정을 한 번에 관리하는 플래닝 도구입니다.',
@@ -30,28 +66,27 @@ const ko = {
       addPlaceholder: '인생 한 줄 추가',
     },
     topGoal: {
-      title: '큰 목표',
-      empty: '아직 큰 목표가 없어요.',
-      addPlaceholder: '큰 목표 추가',
+      title: '최상위 목표',
+      empty: '아직 최상위 목표가 없어요.',
+      addPlaceholder: '최상위 목표 추가',
     },
     roadmap: {
-      title: '아이디어 메모',
-      needTopGoal: '먼저 큰 목표를 추가해주세요.',
+      title: '마인드맵',
+      needTopGoal: '먼저 최상위 목표를 추가해주세요.',
       empty: '이 목표를 위해 떠오르는 생각을 추가해보세요.',
       addPlaceholder: '새 항목',
       addChildPlaceholder: '하위 항목',
       addChild: '하위 추가',
     },
-    weeklyGoal: {
-      title: '이번 주 할 일',
-      empty: '이번 주 실행할 행동을 추가해보세요.',
-      addPlaceholder: '이번 주 행동 추가',
+    dailyGoal: {
+      title: '오늘 할 일',
+      empty: '오늘 할 일을 추가해보세요.',
+      addPlaceholder: '오늘 할 일 추가',
     },
     timetable: {
       title: '시간표',
       addRoutine: '루틴 추가',
       titlePlaceholder: '제목',
-      dayLabel: '요일',
       startsLabel: '시작',
       endsLabel: '종료',
       overlapError: '이미 같은 시간대에 다른 루틴이 있어요.',
@@ -63,12 +98,10 @@ const ko = {
     },
     weeklyTimeline: {
       title: '캘린더',
-      today: '오늘',
       allDay: '하루종일',
       noEvents: '이 날은 일정이 없어요.',
       addEvent: '이벤트 추가',
       eventTitlePlaceholder: '제목',
-      eventTitleLabel: '제목',
       allDayLabel: '하루종일',
       startsLabel: '시작',
       endsLabel: '종료',
@@ -89,14 +122,6 @@ const ko = {
       cancel: '취소',
       delete: '삭제',
     },
-    dailyGoal: {
-      title: '오늘 할 일',
-      empty: '오늘 실행할 항목이 없어요.',
-      fromWeek: '이번 주 할 일에서 배분',
-      addToday: '오늘 추가',
-      exclude: '제외',
-      deletedItem: '(삭제된 항목)',
-    },
   },
   common: {
     add: '추가',
@@ -106,6 +131,7 @@ const ko = {
     confirm: '확인',
     moveUp: '위로 이동',
     moveDown: '아래로 이동',
+    close: '닫기',
   },
   confirm: {
     openTitle: '파일 열기',
@@ -123,12 +149,31 @@ const ko = {
     saveDoneMessage: '저장했어요.',
     saveFailTitle: '저장에 실패했어요.',
     openDoneMessage: '파일을 열었어요.',
-    openFailTitle: '파일을 열지 못했어요.',
     openInvalidFileMessage: '위크보드 파일이 아니에요.',
   },
   date: {
+    // 요일 배열은 JS의 getDay()(0=일요일) 기준이다.
     weekdaysShort: ['일', '월', '화', '수', '목', '금', '토'],
+    // 위크보드의 한 주는 언어와 상관없이 월요일에 시작한다.
     weekdaysMonFirst: ['월', '화', '수', '목', '금', '토', '일'],
+    monthsShort: ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'],
+    dateLabel: '{month}월 {day}일 ({weekday})',
+    monthLabel: '{year}년 {month}월',
+    time12: '{period} {hour}:{minute}',
+    am: '오전',
+    pm: '오후',
+    prevDay: '이전 날',
+    nextDay: '다음 날',
+    prevMonth: '이전 달',
+    nextMonth: '다음 달',
+    // 날짜 선택칸의 순서: y=연, m=월, d=일
+    dateFieldOrder: 'ymd',
+    yearField: '연도',
+    monthField: '월',
+    dayField: '일',
+    hourField: '시',
+    minuteField: '분',
+    periodField: '오전/오후',
   },
   widgetGuide: {
     perWidgetToggleLabel: '이 위젯 가이드 표시',
@@ -139,27 +184,22 @@ const ko = {
       example: '몸도 마음도 건강하게 산다.',
     },
     topGoal: {
-      title: "'인생 한 줄'을 위해 이루고 싶은 것을 적어요.",
+      title: "'{lifeLine}'을 위해 이루고 싶은 것을 적어요.",
       body: '',
       example: '하프 마라톤 완주',
     },
     roadmap: {
-      title: '큰 목표를 위해 해 볼 만한 것들을 떠오르는 대로 적어요.',
+      title: "'{topGoal}'를 위해 방향과 아이디어를 자유롭게 펼쳐 보세요.",
       body: '',
-      example: '러닝 크루 가입, 무릎 보호대 사기, 식단 바꾸기',
-    },
-    weeklyGoal: {
-      title: '이번 주에 할 일들을 모아 두는 곳이에요.',
-      body: "'오늘 할 일'에서 여기 적힌 일을 골라 쓰니까, 횟수는 빼고 한 번에 할 만큼만 적어요.",
-      example: '✕ 주 3회 5km 달리기\n○ 5km 달리기',
+      example: '하프 마라톤 완주 → 보조 앱 도움 받기',
     },
     dailyGoal: {
-      title: "'이번 주 할 일'에서 오늘 할 것만 골라요.",
-      body: '매일 다 할 필요는 없어요.',
-      example: '5km 달리기',
+      title: "'{roadmap}'을 보고 오늘 할 수 있는 만큼 계획해요.",
+      body: '작은 만족은 생각보다 중요합니다.',
+      example: '보조 앱 가이드 따라 뛰기',
     },
     timetable: {
-      title: '수면, 출퇴근, 식사, 집안일처럼 매일 반복하는 일을 적어요.',
+      title: '잠, 출퇴근, 식사, 집안일처럼 매일 반복하는 일을 적어요.',
       body: '적어 두면 내가 실제로 쓸 수 있는 시간이 얼마인지 한눈에 보여요.',
       example: '',
     },

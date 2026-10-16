@@ -1,16 +1,16 @@
 import { create } from 'zustand';
 
+import { mondayOfWeekId } from '../lib/date';
 import { createId } from '../lib/id';
 import type {
   CalendarEvent,
   CanvasWidget,
-  DailyAssignment,
+  DailyGoalItem,
   LifeLineItem,
   PlanningSnapshot,
   RoadmapNode,
   RoutineBlock,
   TopGoal,
-  WeeklyGoalItem,
   WidgetType,
 } from '../types/planning';
 
@@ -18,10 +18,9 @@ const DEFAULT_SIZE: Record<WidgetType, { width: number; height: number }> = {
   lifeLine: { width: 300, height: 320 },
   topGoal: { width: 300, height: 320 },
   roadmap: { width: 320, height: 360 },
-  weeklyGoal: { width: 300, height: 340 },
   dailyGoal: { width: 300, height: 340 },
   timetable: { width: 340, height: 540 },
-  weeklyTimeline: { width: 320, height: 540 },
+  weeklyTimeline: { width: 320, height: 600 },
 };
 
 let placementCounter = 0;
@@ -31,6 +30,18 @@ function nextPlacement() {
 }
 
 type MoveDirection = 'up' | 'down';
+
+// 예전 버전은 "이번 주 할 일"을 주 단위(weekId)로 저장했다. 그런 파일을 열면
+// 각 항목을 그 주 월요일 날짜의 "오늘 할 일"로 옮긴다.
+interface LegacyWeeklyGoal extends Omit<DailyGoalItem, 'date'> {
+  weekId: string;
+}
+
+function migrateDailyGoals(snapshot: PlanningSnapshot): DailyGoalItem[] {
+  if (snapshot.dailyGoals) return snapshot.dailyGoals;
+  const legacy = (snapshot as unknown as { weeklyGoals?: LegacyWeeklyGoal[] }).weeklyGoals ?? [];
+  return legacy.map(({ weekId, ...rest }) => ({ ...rest, date: mondayOfWeekId(weekId) }));
+}
 
 // 목록 안에서 id로 항목을 찾아 바로 앞/뒤 항목과 자리를 바꾼다.
 // 이미 맨 위/아래라 바꿀 수 없으면 원래 배열을 그대로 돌려준다(참조 비교로 변경 여부 판단 가능).
@@ -47,10 +58,9 @@ interface PlanningState {
   lifeLines: LifeLineItem[];
   topGoals: TopGoal[];
   roadmapNodes: RoadmapNode[];
-  weeklyGoals: WeeklyGoalItem[];
+  dailyGoals: DailyGoalItem[];
   events: CalendarEvent[];
   routineBlocks: RoutineBlock[];
-  dailyAssignments: DailyAssignment[];
   widgets: CanvasWidget[];
 
   addLifeLine: (title: string) => void;
@@ -68,11 +78,11 @@ interface PlanningState {
   moveRoadmapNode: (id: string, direction: MoveDirection) => void;
   deleteRoadmapNode: (id: string) => void;
 
-  addWeeklyGoal: (weekId: string, title: string, roadmapNodeId?: string | null) => void;
-  updateWeeklyGoal: (id: string, title: string) => void;
-  moveWeeklyGoal: (id: string, direction: MoveDirection) => void;
-  toggleWeeklyGoalDone: (id: string) => void;
-  deleteWeeklyGoal: (id: string) => void;
+  addDailyGoal: (date: string, title: string, roadmapNodeId?: string | null) => void;
+  updateDailyGoal: (id: string, title: string) => void;
+  moveDailyGoal: (id: string, direction: MoveDirection) => void;
+  toggleDailyGoalDone: (id: string) => void;
+  deleteDailyGoal: (id: string) => void;
 
   addEvent: (event: Omit<CalendarEvent, 'id'>) => string;
   updateEvent: (id: string, patch: Partial<Omit<CalendarEvent, 'id'>>) => void;
@@ -81,10 +91,6 @@ interface PlanningState {
   addRoutineBlock: (block: Omit<RoutineBlock, 'id'>) => string;
   updateRoutineBlock: (id: string, patch: Partial<Omit<RoutineBlock, 'id'>>) => void;
   deleteRoutineBlock: (id: string) => void;
-
-  assignDailyGoal: (weeklyGoalId: string, date: string) => void;
-  toggleDailyAssignmentDone: (id: string) => void;
-  unassignDailyGoal: (id: string) => void;
 
   addWidget: (type: WidgetType, config?: Record<string, string>) => void;
   moveWidget: (id: string, x: number, y: number) => void;
@@ -101,10 +107,9 @@ const emptyState = {
   lifeLines: [],
   topGoals: [],
   roadmapNodes: [],
-  weeklyGoals: [],
+  dailyGoals: [],
   events: [],
   routineBlocks: [],
-  dailyAssignments: [],
   widgets: [],
 };
 
@@ -147,7 +152,7 @@ export const usePlanningStore = create<PlanningState>()((set, get) => ({
         set((s) => ({
           roadmapNodes: s.roadmapNodes.map((n) => (n.id === id ? { ...n, title } : n)),
         })),
-      // 같은 부모(형제) 안에서만 순서를 바꾼다. moveWeeklyGoal과 같은 방식으로
+      // 같은 부모(형제) 안에서만 순서를 바꾼다. moveDailyGoal과 같은 방식으로
       // 형제끼리만 뽑아 순서를 바꾼 뒤 원래 있던 자리에 다시 끼워 넣는다.
       moveRoadmapNode: (id, direction) =>
         set((s) => {
@@ -183,39 +188,38 @@ export const usePlanningStore = create<PlanningState>()((set, get) => ({
           return { roadmapNodes: s.roadmapNodes.filter((n) => !toDelete.has(n.id)) };
         }),
 
-      addWeeklyGoal: (weekId, title, roadmapNodeId = null) =>
+      addDailyGoal: (date, title, roadmapNodeId = null) =>
         set((s) => ({
-          weeklyGoals: [
-            ...s.weeklyGoals,
-            { id: createId(), weekId, title, roadmapNodeId, done: false, createdAt: Date.now() },
+          dailyGoals: [
+            ...s.dailyGoals,
+            { id: createId(), date, title, roadmapNodeId, done: false, createdAt: Date.now() },
           ],
         })),
-      updateWeeklyGoal: (id, title) =>
+      updateDailyGoal: (id, title) =>
         set((s) => ({
-          weeklyGoals: s.weeklyGoals.map((g) => (g.id === id ? { ...g, title } : g)),
+          dailyGoals: s.dailyGoals.map((g) => (g.id === id ? { ...g, title } : g)),
         })),
-      // weeklyGoals는 모든 주의 항목을 한 배열에 같이 담고 있어서, 같은 주 항목끼리만
-      // 뽑아 순서를 바꾼 뒤 원래 자리(그 주 항목이 있던 인덱스들)에 다시 끼워 넣는다.
-      moveWeeklyGoal: (id, direction) =>
+      // dailyGoals는 모든 날의 항목을 한 배열에 같이 담고 있어서, 같은 날 항목끼리만
+      // 뽑아 순서를 바꾼 뒤 원래 자리(그 날 항목이 있던 인덱스들)에 다시 끼워 넣는다.
+      moveDailyGoal: (id, direction) =>
         set((s) => {
-          const goal = s.weeklyGoals.find((g) => g.id === id);
+          const goal = s.dailyGoals.find((g) => g.id === id);
           if (!goal) return {};
-          const sameWeek = s.weeklyGoals.filter((g) => g.weekId === goal.weekId);
-          const reordered = moveById(sameWeek, id, direction);
-          if (reordered === sameWeek) return {};
+          const sameDay = s.dailyGoals.filter((g) => g.date === goal.date);
+          const reordered = moveById(sameDay, id, direction);
+          if (reordered === sameDay) return {};
           let i = 0;
           return {
-            weeklyGoals: s.weeklyGoals.map((g) => (g.weekId === goal.weekId ? reordered[i++] : g)),
+            dailyGoals: s.dailyGoals.map((g) => (g.date === goal.date ? reordered[i++] : g)),
           };
         }),
-      toggleWeeklyGoalDone: (id) =>
+      toggleDailyGoalDone: (id) =>
         set((s) => ({
-          weeklyGoals: s.weeklyGoals.map((g) => (g.id === id ? { ...g, done: !g.done } : g)),
+          dailyGoals: s.dailyGoals.map((g) => (g.id === id ? { ...g, done: !g.done } : g)),
         })),
-      deleteWeeklyGoal: (id) =>
+      deleteDailyGoal: (id) =>
         set((s) => ({
-          weeklyGoals: s.weeklyGoals.filter((g) => g.id !== id),
-          dailyAssignments: s.dailyAssignments.filter((a) => a.weeklyGoalId !== id),
+          dailyGoals: s.dailyGoals.filter((g) => g.id !== id),
         })),
 
       addEvent: (event) => {
@@ -238,22 +242,6 @@ export const usePlanningStore = create<PlanningState>()((set, get) => ({
         })),
       deleteRoutineBlock: (id) =>
         set((s) => ({ routineBlocks: s.routineBlocks.filter((b) => b.id !== id) })),
-
-      assignDailyGoal: (weeklyGoalId, date) =>
-        set((s) => ({
-          dailyAssignments: [
-            ...s.dailyAssignments,
-            { id: createId(), weeklyGoalId, date, done: false },
-          ],
-        })),
-      toggleDailyAssignmentDone: (id) =>
-        set((s) => ({
-          dailyAssignments: s.dailyAssignments.map((a) =>
-            a.id === id ? { ...a, done: !a.done } : a
-          ),
-        })),
-      unassignDailyGoal: (id) =>
-        set((s) => ({ dailyAssignments: s.dailyAssignments.filter((a) => a.id !== id) })),
 
       addWidget: (type, config) =>
         set((s) => {
@@ -301,10 +289,9 @@ export const usePlanningStore = create<PlanningState>()((set, get) => ({
           lifeLines: s.lifeLines,
           topGoals: s.topGoals,
           roadmapNodes: s.roadmapNodes,
-          weeklyGoals: s.weeklyGoals,
+          dailyGoals: s.dailyGoals,
           events: s.events,
           routineBlocks: s.routineBlocks,
-          dailyAssignments: s.dailyAssignments,
           widgets: s.widgets,
           updatedAt: Date.now(),
         };
@@ -314,11 +301,13 @@ export const usePlanningStore = create<PlanningState>()((set, get) => ({
           lifeLines: snapshot.lifeLines ?? [],
           topGoals: snapshot.topGoals ?? [],
           roadmapNodes: snapshot.roadmapNodes ?? [],
-          weeklyGoals: snapshot.weeklyGoals ?? [],
+          dailyGoals: migrateDailyGoals(snapshot),
           events: snapshot.events ?? [],
           routineBlocks: snapshot.routineBlocks ?? [],
-          dailyAssignments: snapshot.dailyAssignments ?? [],
-          widgets: snapshot.widgets ?? [],
+          // 이전 버전 파일에는 지금은 없는 위젯 종류가 들어있을 수 있어 걸러낸다.
+          widgets: (snapshot.widgets ?? [])
+            .map((w) => ((w.type as string) === 'weeklyGoal' ? { ...w, type: 'dailyGoal' as const } : w))
+            .filter((w) => w.type in DEFAULT_SIZE),
         }),
     })
 );

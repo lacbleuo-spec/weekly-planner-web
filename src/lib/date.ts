@@ -1,3 +1,8 @@
+import type { Dictionary } from '../i18n/ko';
+import { interpolate } from '../i18n/interpolate';
+
+type DateStrings = Dictionary['date'];
+
 // ISO 주차 계산 (월요일 시작)
 
 export function startOfWeek(date: Date): Date {
@@ -34,6 +39,15 @@ export function getWeekId(date: Date = new Date()): string {
   return `${thursday.getFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
+// getWeekId의 역방향: "2026-W41" -> 그 주 월요일의 "YYYY-MM-DD".
+// 1월 4일은 항상 ISO 1주차에 속한다는 점을 이용한다.
+export function mondayOfWeekId(weekId: string): string {
+  const m = /^(\d{4})-W(\d{2})$/.exec(weekId);
+  if (!m) return formatDate(new Date());
+  const firstMonday = startOfWeek(new Date(Number(m[1]), 0, 4));
+  return formatDate(addWeeks(firstMonday, Number(m[2]) - 1));
+}
+
 export function formatWeekRange(monday: Date): string {
   const sunday = addDays(monday, 6);
   const fmt = (d: Date) => `${d.getMonth() + 1}.${d.getDate()}`;
@@ -47,8 +61,22 @@ export function formatDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-export function formatDateLabel(date: Date, weekdayLabels: string[]): string {
-  return `${date.getMonth() + 1}월 ${date.getDate()}일 (${weekdayLabels[date.getDay()]})`;
+function dateVars(date: Date, strings: DateStrings) {
+  return {
+    year: date.getFullYear(),
+    month: date.getMonth() + 1,
+    monthName: strings.monthsShort[date.getMonth()],
+    day: date.getDate(),
+    weekday: strings.weekdaysShort[date.getDay()],
+  };
+}
+
+export function formatDateLabel(date: Date, strings: DateStrings): string {
+  return interpolate(strings.dateLabel, dateVars(date, strings));
+}
+
+export function formatMonthLabel(date: Date, strings: DateStrings): string {
+  return interpolate(strings.monthLabel, dateVars(date, strings));
 }
 
 export function formatTime(date: Date): string {
@@ -76,10 +104,11 @@ export function addMonths(date: Date, months: number): Date {
 }
 
 // 오전/오후 12시간제 (아이폰 캘린더 스타일)
-export function formatTime12(date: Date): string {
+export function formatTime12(date: Date, strings: DateStrings): string {
   const h = date.getHours();
-  const m = String(date.getMinutes()).padStart(2, '0');
-  const period = h < 12 ? '오전' : '오후';
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${period} ${h12}:${m}`;
+  return interpolate(strings.time12, {
+    period: h < 12 ? strings.am : strings.pm,
+    hour: h % 12 === 0 ? 12 : h % 12,
+    minute: String(date.getMinutes()).padStart(2, '0'),
+  });
 }

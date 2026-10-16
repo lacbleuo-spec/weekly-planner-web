@@ -3,7 +3,6 @@ import {
   CheckSquare,
   Compass,
   Map,
-  Sun,
   Table2,
   Target,
   type LucideIcon,
@@ -12,21 +11,19 @@ import {
 import type { WidgetType } from '../../types/planning';
 
 export const WIDGET_ORDER: WidgetType[] = [
+  'timetable',
+  'weeklyTimeline',
   'lifeLine',
   'topGoal',
   'roadmap',
-  'weeklyGoal',
   'dailyGoal',
-  'timetable',
-  'weeklyTimeline',
 ];
 
 export const WIDGET_ICONS: Record<WidgetType, LucideIcon> = {
   lifeLine: Compass,
   topGoal: Target,
   roadmap: Map,
-  weeklyGoal: CheckSquare,
-  dailyGoal: Sun,
+  dailyGoal: CheckSquare,
   timetable: Table2,
   weeklyTimeline: Calendar,
 };

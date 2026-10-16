@@ -28,9 +28,15 @@ interface FilePickerAcceptType {
   accept: Record<string, string[]>;
 }
 
-const FILE_TYPES: FilePickerAcceptType[] = [
-  { description: 'Weekboard file', accept: { 'application/json': ['.json'] } },
-];
+// 파일 대화상자에 보이는 문구는 현재 언어에 맞춰 호출하는 쪽에서 넘겨준다.
+export interface FileLabels {
+  defaultName: string; // 확장자 없는 기본 파일명(예: "무제")
+  typeDescription: string; // 파일 형식 설명(예: "위크보드 파일")
+}
+
+function fileTypes(labels: FileLabels): FilePickerAcceptType[] {
+  return [{ description: labels.typeDescription, accept: { 'application/json': ['.json'] } }];
+}
 
 function getShowSaveFilePicker() {
   return (
@@ -61,8 +67,8 @@ function getShowOpenFilePicker() {
   ).showOpenFilePicker;
 }
 
-function defaultFileName(): string {
-  return '무제.json';
+function defaultFileName(labels: FileLabels): string {
+  return `${labels.defaultName}.json`;
 }
 
 function downloadAsFile(json: string, fileName: string): void {
@@ -144,12 +150,12 @@ export interface OpenedFile {
 // 열기: 취소하면 null, 형식이 맞지 않으면 예외를 던진다.
 // 위치 기억이 가능한 브라우저에서는 handle도 함께 돌려주어, 이후 "저장"이
 // 대화상자 없이 같은 파일에 바로 덮어쓸 수 있게 한다.
-export async function openSnapshotFile(): Promise<OpenedFile | null> {
+export async function openSnapshotFile(labels: FileLabels): Promise<OpenedFile | null> {
   const showOpenFilePicker = getShowOpenFilePicker();
 
   if (showOpenFilePicker) {
     try {
-      const [handle] = await showOpenFilePicker({ types: FILE_TYPES, multiple: false });
+      const [handle] = await showOpenFilePicker({ types: fileTypes(labels), multiple: false });
       const file = await handle.getFile();
       const snapshot = parseSnapshot(await file.text());
       return { snapshot, handle, fileName: file.name };
@@ -195,17 +201,18 @@ export interface SavedFile {
 // 다운로드 대화상자에서 기존 파일을 "바꾸기"로 고르기 쉽게 한다.
 export async function saveSnapshotAs(
   snapshot: PlanningSnapshot,
+  labels: FileLabels,
   preferredName?: string
 ): Promise<SavedFile | 'cancelled'> {
   const json = JSON.stringify(snapshot, null, 2);
-  const suggestedName = preferredName ?? defaultFileName();
+  const suggestedName = preferredName ?? defaultFileName(labels);
   const showSaveFilePicker = getShowSaveFilePicker();
 
   if (showSaveFilePicker) {
     try {
       const handle = await showSaveFilePicker({
         suggestedName,
-        types: FILE_TYPES,
+        types: fileTypes(labels),
       });
       const writable = await handle.createWritable();
       await writable.write(json);

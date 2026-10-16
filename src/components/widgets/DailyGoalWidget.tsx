@@ -1,95 +1,137 @@
-import { Check, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, X } from 'lucide-react';
+import { useMemo, useState, type KeyboardEvent } from 'react';
 
 import { useDict } from '../../i18n';
-import { addDays, formatDate, formatDateLabel, getWeekId } from '../../lib/date';
+import { addDays, formatDate, formatDateLabel, startOfDay } from '../../lib/date';
 import { usePlanningStore } from '../../store/usePlanningStore';
+import { AddRow } from '../ui/AddRow';
 
 export function DailyGoalWidget() {
   const dict = useDict();
   const [dayOffset, setDayOffset] = useState(0);
-  const date = useMemo(() => addDays(new Date(), dayOffset), [dayOffset]);
-  const dateKey = formatDate(date);
-  const weekId = getWeekId(date);
+  const day = useMemo(() => addDays(startOfDay(new Date()), dayOffset), [dayOffset]);
+  const date = useMemo(() => formatDate(day), [day]);
 
-  const weeklyGoals = usePlanningStore((s) => s.weeklyGoals);
-  const dailyAssignments = usePlanningStore((s) => s.dailyAssignments);
-  const assignDailyGoal = usePlanningStore((s) => s.assignDailyGoal);
-  const toggleDailyAssignmentDone = usePlanningStore((s) => s.toggleDailyAssignmentDone);
-  const unassignDailyGoal = usePlanningStore((s) => s.unassignDailyGoal);
+  const dailyGoals = usePlanningStore((s) => s.dailyGoals);
+  const addDailyGoal = usePlanningStore((s) => s.addDailyGoal);
+  const updateDailyGoal = usePlanningStore((s) => s.updateDailyGoal);
+  const moveDailyGoal = usePlanningStore((s) => s.moveDailyGoal);
+  const toggleDailyGoalDone = usePlanningStore((s) => s.toggleDailyGoalDone);
+  const deleteDailyGoal = usePlanningStore((s) => s.deleteDailyGoal);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
 
-  const assignmentsToday = dailyAssignments.filter((a) => a.date === dateKey);
-  const assignedGoalIds = new Set(assignmentsToday.map((a) => a.weeklyGoalId));
-  const weekGoals = weeklyGoals.filter((g) => g.weekId === weekId);
-  const unassignedThisWeek = weekGoals.filter((g) => !assignedGoalIds.has(g.id));
+  const items = dailyGoals.filter((g) => g.date === date);
 
-  const goalTitle = (id: string) =>
-    weeklyGoals.find((g) => g.id === id)?.title ?? dict.widgets.dailyGoal.deletedItem;
+  const startEdit = (id: string, title: string) => {
+    setEditingId(id);
+    setEditValue(title);
+  };
+
+  const commitEdit = () => {
+    const trimmed = editValue.trim();
+    if (editingId && trimmed) updateDailyGoal(editingId, trimmed);
+    setEditingId(null);
+  };
+
+  const onEditKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') commitEdit();
+    if (e.key === 'Escape') setEditingId(null);
+  };
 
   return (
     <div className="flex h-full flex-col">
       <div className="mb-1.5 flex items-center justify-between text-subink">
-        <button onClick={() => setDayOffset((o) => o - 1)} className="hover:text-accent">
+        <button
+          onClick={() => setDayOffset((o) => o - 1)}
+          aria-label={dict.date.prevDay}
+          className="hover:text-accent"
+        >
           <ChevronLeft size={16} />
         </button>
-        <span className="text-[12px] font-medium">
-          {formatDateLabel(date, dict.date.weekdaysShort)}
-        </span>
-        <button onClick={() => setDayOffset((o) => o + 1)} className="hover:text-accent">
+        <span className="text-[12px] font-medium">{formatDateLabel(day, dict.date)}</span>
+        <button
+          onClick={() => setDayOffset((o) => o + 1)}
+          aria-label={dict.date.nextDay}
+          className="hover:text-accent"
+        >
           <ChevronRight size={16} />
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {assignmentsToday.length === 0 && (
-          <p className="mb-2 text-[13px] text-faint">{dict.widgets.dailyGoal.empty}</p>
+        {items.length === 0 && (
+          <p className="text-[13px] text-faint">{dict.widgets.dailyGoal.empty}</p>
         )}
-        {assignmentsToday.map((a) => (
-          <div key={a.id} className="group flex items-center justify-between gap-2 py-1.5">
-            <button
-              onClick={() => toggleDailyAssignmentDone(a.id)}
-              className="flex flex-1 items-center gap-2 text-left"
-            >
-              <span
-                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
-                  a.done ? 'border-accent bg-accent text-white' : 'border-line text-transparent'
-                }`}
-              >
-                <Check size={11} strokeWidth={3} />
-              </span>
-              <span
-                className={`flex-1 text-[14px] ${a.done ? 'text-faint line-through' : 'text-ink'}`}
-              >
-                {goalTitle(a.weeklyGoalId)}
-              </span>
-            </button>
-            <button
-              onClick={() => unassignDailyGoal(a.id)}
-              aria-label={dict.widgets.dailyGoal.exclude}
-              className="text-faint opacity-0 transition hover:text-danger group-hover:opacity-100"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        ))}
-        {unassignedThisWeek.length > 0 && (
-          <div className="mt-2 border-t border-line pt-2">
-            <p className="mb-1 text-[11px] text-faint">{dict.widgets.dailyGoal.fromWeek}</p>
-            {unassignedThisWeek.map((g) => (
+        {items.map((g, index) => (
+          <div key={g.id} className="group flex items-center justify-between gap-2 py-1.5">
+            {editingId === g.id ? (
+              <input
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onKeyDown={onEditKeyDown}
+                onBlur={commitEdit}
+                autoFocus
+                onFocus={(e) => e.target.select()}
+                className="min-w-0 flex-1 bg-transparent text-[14px] text-ink focus:outline-none"
+              />
+            ) : (
               <button
-                key={g.id}
-                onClick={() => assignDailyGoal(g.id, dateKey)}
-                className="flex w-full items-center justify-between gap-2 rounded-control py-1 text-left"
+                onClick={() => toggleDailyGoalDone(g.id)}
+                className="flex flex-1 items-center gap-2 text-left"
               >
-                <span className="flex-1 text-[13px] text-ink">{g.title}</span>
-                <span className="flex items-center gap-0.5 text-[11px] font-medium text-accent">
-                  <Plus size={11} />
-                  {dict.widgets.dailyGoal.addToday}
+                <span
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                    g.done ? 'border-accent bg-accent text-white' : 'border-line text-transparent'
+                  }`}
+                >
+                  <Check size={11} strokeWidth={3} />
+                </span>
+                <span
+                  className={`flex-1 text-[14px] ${g.done ? 'text-faint line-through' : 'text-ink'}`}
+                >
+                  {g.title}
                 </span>
               </button>
-            ))}
+            )}
+            <div className="flex items-center gap-2 opacity-0 transition group-hover:opacity-100">
+              <button
+                onClick={() => moveDailyGoal(g.id, 'up')}
+                disabled={index === 0}
+                aria-label={dict.common.moveUp}
+                className="text-faint hover:text-accent disabled:pointer-events-none disabled:opacity-30"
+              >
+                <ChevronUp size={14} />
+              </button>
+              <button
+                onClick={() => moveDailyGoal(g.id, 'down')}
+                disabled={index === items.length - 1}
+                aria-label={dict.common.moveDown}
+                className="text-faint hover:text-accent disabled:pointer-events-none disabled:opacity-30"
+              >
+                <ChevronDown size={14} />
+              </button>
+              <button
+                onClick={() => startEdit(g.id, g.title)}
+                aria-label={dict.common.edit}
+                className="text-faint hover:text-accent"
+              >
+                <Pencil size={14} />
+              </button>
+              <button
+                onClick={() => deleteDailyGoal(g.id)}
+                aria-label={dict.common.delete}
+                className="text-faint hover:text-danger"
+              >
+                <X size={14} />
+              </button>
+            </div>
           </div>
-        )}
+        ))}
       </div>
+      <AddRow
+        placeholder={dict.widgets.dailyGoal.addPlaceholder}
+        onSubmit={(title) => addDailyGoal(date, title)}
+      />
     </div>
   );
 }

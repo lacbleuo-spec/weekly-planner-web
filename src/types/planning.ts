@@ -1,11 +1,12 @@
-// 위크보드 6단계 플래닝 구조:
-// 인생 한 줄 -> 큰 목표 -> 아이디어 메모 -> 이번 주 할 일 -> 캘린더 -> 오늘 할 일
+import type { Locale } from '../i18n/locale';
+
+// 위크보드 플래닝 구조:
+// 시간표 -> 캘린더 -> 인생 한 줄 -> 최상위 목표 -> 마인드맵 -> 오늘 할 일
 
 export type WidgetType =
   | 'lifeLine'
   | 'topGoal'
   | 'roadmap'
-  | 'weeklyGoal'
   | 'dailyGoal'
   | 'timetable'
   | 'weeklyTimeline';
@@ -30,9 +31,9 @@ export interface RoadmapNode {
   createdAt: number;
 }
 
-export interface WeeklyGoalItem {
+export interface DailyGoalItem {
   id: string;
-  weekId: string; // e.g. 2026-W34
+  date: string; // YYYY-MM-DD
   roadmapNodeId: string | null;
   title: string;
   done: boolean;
@@ -48,13 +49,6 @@ export interface CalendarEvent {
   allDay: boolean;
   alarmMinutesBefore: number | null; // null = 알림 없음, 0 = 이벤트 시간에, 그 외 = 시작 전 분(分)
   color: string;
-}
-
-export interface DailyAssignment {
-  id: string;
-  weeklyGoalId: string;
-  date: string; // YYYY-MM-DD
-  done: boolean;
 }
 
 // 대학교 시간표처럼 특정 날짜가 아니라 요일마다 매주 반복되는 루틴.
@@ -86,10 +80,11 @@ export interface PlanningSnapshot {
   lifeLines: LifeLineItem[];
   topGoals: TopGoal[];
   roadmapNodes: RoadmapNode[];
-  weeklyGoals: WeeklyGoalItem[];
+  dailyGoals: DailyGoalItem[];
   events: CalendarEvent[];
   routineBlocks: RoutineBlock[];
-  dailyAssignments: DailyAssignment[];
   widgets: CanvasWidget[];
+  // 저장한 시점의 화면 언어. 예전 파일에는 없을 수 있다.
+  locale?: Locale;
   updatedAt: number;
 }
