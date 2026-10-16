@@ -76,7 +76,7 @@ const en: Dictionary = {
       addPlaceholder: "Add today's task",
     },
     timetable: {
-      title: 'Timetable',
+      title: 'Routine',
       addRoutine: 'Add routine',
       titlePlaceholder: 'Title',
       startsLabel: 'Start',
@@ -89,7 +89,7 @@ const en: Dictionary = {
       delete: 'Delete',
     },
     weeklyTimeline: {
-      title: 'Calendar',
+      title: 'Schedule',
       allDay: 'All day',
       noEvents: 'No events on this day.',
       addEvent: 'Add event',

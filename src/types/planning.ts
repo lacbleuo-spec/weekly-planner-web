@@ -1,7 +1,7 @@
 import type { Locale } from '../i18n/locale';
 
 // 위크보드 플래닝 구조:
-// 시간표 -> 캘린더 -> 인생 한 줄 -> 최상위 목표 -> 마인드맵 -> 오늘 할 일
+// 인생 한 줄 -> 최상위 목표 -> 마인드맵 -> 오늘 할 일 -> 루틴 -> 일정
 
 export type WidgetType =
   | 'lifeLine'

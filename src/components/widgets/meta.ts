@@ -11,12 +11,12 @@ import {
 import type { WidgetType } from '../../types/planning';
 
 export const WIDGET_ORDER: WidgetType[] = [
-  'timetable',
-  'weeklyTimeline',
   'lifeLine',
   'topGoal',
   'roadmap',
   'dailyGoal',
+  'timetable',
+  'weeklyTimeline',
 ];
 
 export const WIDGET_ICONS: Record<WidgetType, LucideIcon> = {

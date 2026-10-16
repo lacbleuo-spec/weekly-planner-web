@@ -84,7 +84,7 @@ const ko = {
       addPlaceholder: '오늘 할 일 추가',
     },
     timetable: {
-      title: '시간표',
+      title: '루틴',
       addRoutine: '루틴 추가',
       titlePlaceholder: '제목',
       startsLabel: '시작',
@@ -97,7 +97,7 @@ const ko = {
       delete: '삭제',
     },
     weeklyTimeline: {
-      title: '캘린더',
+      title: '일정',
       allDay: '하루종일',
       noEvents: '이 날은 일정이 없어요.',
       addEvent: '이벤트 추가',
