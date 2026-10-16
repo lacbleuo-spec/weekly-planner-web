@@ -75,6 +75,17 @@ export function formatDateLabel(date: Date, strings: DateStrings): string {
   return interpolate(strings.dateLabel, dateVars(date, strings));
 }
 
+// "10월 16일" 대신 아이폰 일정 편집처럼 짧은 칩에 넣는 날짜 문구 ("2026. 10. 16.", "Oct 16, 2026").
+export function formatDatePill(date: Date, strings: DateStrings): string {
+  return interpolate(strings.datePill, dateVars(date, strings));
+}
+
+// "YYYY-MM-DD" -> 그 날 0시의 Date (시간대 변환 없이 로컬 기준).
+export function parseDate(value: string): Date {
+  const [y, m, d] = value.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 export function formatMonthLabel(date: Date, strings: DateStrings): string {
   return interpolate(strings.monthLabel, dateVars(date, strings));
 }
@@ -111,4 +122,17 @@ export function formatTime12(date: Date, strings: DateStrings): string {
     hour: h % 12 === 0 ? 12 : h % 12,
     minute: String(date.getMinutes()).padStart(2, '0'),
   });
+}
+
+// 아이폰 캘린더처럼 항상 6주(42칸)를 채우되, 마지막 줄이 전부 다음 달이면 생략한다.
+// 위크보드의 한 주는 월요일에 시작한다.
+export function buildMonthGrid(viewMonth: Date): Date[] {
+  const first = startOfMonth(viewMonth);
+  const gridStart = addDays(first, -((first.getDay() + 6) % 7));
+  const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
+  const lastRow = days.slice(35, 42);
+  if (lastRow.every((d) => d.getMonth() !== viewMonth.getMonth())) {
+    return days.slice(0, 35);
+  }
+  return days;
 }

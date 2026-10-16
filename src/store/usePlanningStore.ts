@@ -20,7 +20,7 @@ const DEFAULT_SIZE: Record<WidgetType, { width: number; height: number }> = {
   roadmap: { width: 320, height: 360 },
   dailyGoal: { width: 300, height: 340 },
   timetable: { width: 340, height: 540 },
-  weeklyTimeline: { width: 320, height: 600 },
+  weeklyTimeline: { width: 320, height: 540 },
 };
 
 let placementCounter = 0;

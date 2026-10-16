@@ -1,22 +1,25 @@
 import { Bell, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { useDict } from '../../i18n';
 import type { Dictionary } from '../../i18n/ko';
 import {
   addDays,
   addMonths,
+  buildMonthGrid,
   formatDate,
   formatDateLabel,
+  formatDatePill,
   formatMonthLabel,
   formatTime12,
+  parseDate,
   isSameDay,
   startOfDay,
   startOfMonth,
 } from '../../lib/date';
 import { PALETTE } from '../../lib/palette';
-import { DateSelect } from '../ui/DateSelect';
-import { TimeSelect } from '../ui/TimeSelect';
+import { DatePanel } from '../ui/DatePanel';
+import { TimePanel } from '../ui/TimePanel';
 import { usePlanningStore } from '../../store/usePlanningStore';
 import type { CalendarEvent } from '../../types/planning';
 
@@ -91,17 +94,61 @@ function timeLabelFor(
   return allDayText;
 }
 
-// 아이폰 캘린더처럼 항상 6주(42칸)를 채우되, 마지막 줄이 전부 다음 달이면 생략한다.
-// 위크보드의 한 주는 월요일에 시작한다.
-function buildMonthGrid(viewMonth: Date): Date[] {
-  const first = startOfMonth(viewMonth);
-  const gridStart = addDays(first, -((first.getDay() + 6) % 7));
-  const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
-  const lastRow = days.slice(35, 42);
-  if (lastRow.every((d) => d.getMonth() !== viewMonth.getMonth())) {
-    return days.slice(0, 35);
-  }
-  return days;
+type PickerKey = 'startDate' | 'startTime' | 'endDate' | 'endTime';
+
+// 아이폰 일정 편집의 날짜/시간 칩. 눌러서 아래 선택 패널을 펼치면 강조색으로 보인다.
+function Pill({
+  active,
+  invalid = false,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  invalid?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-expanded={active}
+      className={`rounded-control px-2.5 py-1 text-[12.5px] transition ${
+        active
+          ? 'bg-accent-soft font-medium text-accent'
+          : invalid
+            ? 'bg-canvas text-danger'
+            : 'bg-canvas text-ink hover:bg-line'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Switch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`relative h-6 w-10 shrink-0 rounded-full transition ${checked ? 'bg-accent' : 'bg-line'}`}
+    >
+      <span
+        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+          checked ? 'left-[18px]' : 'left-0.5'
+        }`}
+      />
+    </button>
+  );
 }
 
 export function WeeklyTimelineWidget() {
@@ -142,6 +189,29 @@ export function WeeklyTimelineWidget() {
   const [endTime, setEndTime] = useState('10:00');
   const [alarmKey, setAlarmKey] = useState('none');
   const [rangeError, setRangeError] = useState(false);
+  const [picker, setPicker] = useState<PickerKey | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // 아이폰 일정처럼, 시작을 바꾸면 종료도 같은 간격만큼 같이 옮겨서 "종료가 시작보다 빠름"이 생기지 않게 한다.
+  const changeStart = (nextDate: string, nextTime: string) => {
+    const toMs = (d: string, t: string) => new Date(`${d}T${t}:00`).getTime();
+    const delta = toMs(nextDate, nextTime) - toMs(startDate, startTime);
+    const end = new Date(toMs(endDate, endTime) + delta);
+    setEndDate(formatDate(end));
+    setEndTime(`${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`);
+    setStartDate(nextDate);
+    setStartTime(nextTime);
+    setRangeError(false);
+  };
+  const togglePicker = (key: PickerKey) => setPicker((p) => (p === key ? null : key));
+  const timeText = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    return formatTime12(new Date(2000, 0, 1, h, m), dict.date);
+  };
+
+  // 패널이 펼쳐지면 스크롤 영역 안에서 보이는 위치로 옮긴다.
+  useEffect(() => {
+    if (picker) panelRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [picker]);
 
   const openForm = () => {
     setTitle('');
@@ -152,6 +222,7 @@ export function WeeklyTimelineWidget() {
     setEndTime('10:00');
     setAlarmKey('none');
     setRangeError(false);
+    setPicker(null);
     setShowForm(true);
   };
 
@@ -179,73 +250,78 @@ export function WeeklyTimelineWidget() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-1.5 flex shrink-0 items-center justify-between">
-        <button
-          onClick={() => shiftMonth(-1)}
-          aria-label={dict.date.prevMonth}
-          className="text-subink hover:text-accent"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <button onClick={goToday} className="text-[13px] font-semibold text-ink">
-          {formatMonthLabel(viewMonth, dict.date)}
-        </button>
-        <button
-          onClick={() => shiftMonth(1)}
-          aria-label={dict.date.nextMonth}
-          className="text-subink hover:text-accent"
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
-
-      <div className="mb-1 grid shrink-0 grid-cols-7 text-center">
-        {dict.date.weekdaysMonFirst.map((w, i) => (
-          <span key={i} className="text-[10px] text-faint">
-            {w}
-          </span>
-        ))}
-      </div>
-
-      <div className="mb-1.5 grid shrink-0 grid-cols-7 gap-y-0.5">
-        {gridDays.map((d, i) => {
-          const inMonth = d.getMonth() === viewMonth.getMonth();
-          const isSelected = isSameDay(d, selectedDate);
-          const isToday = isSameDay(d, new Date());
-          const dots = eventsOnDay(events, d).slice(0, 3);
-          return (
+      {/* 일정 폼이 열려 있을 때는 폼이 날짜를 고르므로, 위쪽 달력은 접어서 자리를 비운다. */}
+      {!showForm && (
+        <>
+          <div className="mb-1.5 flex shrink-0 items-center justify-between">
             <button
-              key={i}
-              onClick={() => selectDay(d)}
-              aria-label={formatDateLabel(d, dict.date)}
-              className="flex flex-col items-center gap-0.5 py-0.5"
+              onClick={() => shiftMonth(-1)}
+              aria-label={dict.date.prevMonth}
+              className="text-subink hover:text-accent"
             >
-              <span
-                className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] transition ${
-                  isSelected
-                    ? 'bg-ink font-semibold text-white'
-                    : isToday
-                      ? 'font-semibold text-danger'
-                      : inMonth
-                        ? 'text-ink'
-                        : 'text-faint/50'
-                }`}
-              >
-                {d.getDate()}
-              </span>
-              <span className="flex h-1 gap-0.5">
-                {dots.map((e) => (
-                  <span key={e.id} className="h-1 w-1 rounded-full" style={{ backgroundColor: e.color }} />
-                ))}
-              </span>
+              <ChevronLeft size={16} />
             </button>
-          );
-        })}
-      </div>
+            <button onClick={goToday} className="text-[13px] font-semibold text-ink">
+              {formatMonthLabel(viewMonth, dict.date)}
+            </button>
+            <button
+              onClick={() => shiftMonth(1)}
+              aria-label={dict.date.nextMonth}
+              className="text-subink hover:text-accent"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+
+          <div className="mb-1 grid shrink-0 grid-cols-7 text-center">
+            {dict.date.weekdaysMonFirst.map((w, i) => (
+              <span key={i} className="text-[10px] text-faint">
+                {w}
+              </span>
+            ))}
+          </div>
+
+          <div className="mb-1.5 grid shrink-0 grid-cols-7 gap-y-0.5">
+            {gridDays.map((d, i) => {
+              const inMonth = d.getMonth() === viewMonth.getMonth();
+              const isSelected = isSameDay(d, selectedDate);
+              const isToday = isSameDay(d, new Date());
+              const dots = eventsOnDay(events, d).slice(0, 3);
+              return (
+                <button
+                  key={i}
+                  onClick={() => selectDay(d)}
+                  aria-label={formatDateLabel(d, dict.date)}
+                  className="flex flex-col items-center gap-0.5 py-0.5"
+                >
+                  <span
+                    className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] transition ${
+                      isSelected
+                        ? 'bg-ink font-semibold text-white'
+                        : isToday
+                          ? 'font-semibold text-danger'
+                          : inMonth
+                            ? 'text-ink'
+                            : 'text-faint/50'
+                    }`}
+                  >
+                    {d.getDate()}
+                  </span>
+                  <span className="flex h-1 gap-0.5">
+                    {dots.map((e) => (
+                      <span key={e.id} className="h-1 w-1 rounded-full" style={{ backgroundColor: e.color }} />
+                    ))}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {showForm ? (
         <>
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto border-t border-line pt-2">
+          <div className="min-h-0 flex-1 overflow-y-auto pt-2">
             <input
               autoFocus
               value={title}
@@ -253,55 +329,85 @@ export function WeeklyTimelineWidget() {
               placeholder={t.eventTitlePlaceholder}
               className="w-full rounded-control border border-line bg-canvas px-2.5 py-1.5 text-[13px] text-ink placeholder:text-faint focus:border-accent focus:outline-none"
             />
-            <label className="flex items-center justify-between text-[12.5px] text-subink">
-              {t.allDayLabel}
-              <input
-                type="checkbox"
+            <div className="flex items-center justify-between pt-3">
+              <span className="text-[12.5px] text-subink">{t.allDayLabel}</span>
+              <Switch
                 checked={allDay}
-                onChange={(e) => setAllDay(e.target.checked)}
-                className="h-4 w-4 accent-accent"
+                label={t.allDayLabel}
+                onChange={(v) => {
+                  setAllDay(v);
+                  setPicker((p) => (v && (p === 'startTime' || p === 'endTime') ? null : p));
+                }}
               />
-            </label>
-            <div className="space-y-1 text-[12px] text-subink">
-              <div className="flex items-center gap-1.5">
-                <span className="w-9 shrink-0">{t.startsLabel}</span>
-                <DateSelect
-                  value={startDate}
-                  onChange={(v) => {
-                    setStartDate(v);
-                    setRangeError(false);
-                  }}
-                />
+            </div>
+            <div className="pt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[12.5px] text-subink">{t.startsLabel}</span>
+                <div className="flex items-center gap-1.5">
+                  <Pill active={picker === 'startDate'} onClick={() => togglePicker('startDate')}>
+                    {formatDatePill(parseDate(startDate), dict.date)}
+                  </Pill>
+                  {!allDay && (
+                    <Pill active={picker === 'startTime'} onClick={() => togglePicker('startTime')}>
+                      {timeText(startTime)}
+                    </Pill>
+                  )}
+                </div>
               </div>
-              {!allDay && (
-                <div className="pl-[42px]">
-                  <TimeSelect
+              {picker === 'startDate' && (
+                <div ref={panelRef}>
+                  <DatePanel
+                    value={startDate}
+                    onChange={(v) => changeStart(v, startTime)}
+                  />
+                </div>
+              )}
+              {picker === 'startTime' && !allDay && (
+                <div ref={panelRef}>
+                  <TimePanel
                     value={startTime}
+                    onChange={(v) => changeStart(startDate, v)}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="pt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[12.5px] text-subink">{t.endsLabel}</span>
+                <div className="flex items-center gap-1.5">
+                  <Pill
+                    active={picker === 'endDate'}
+                    invalid={rangeError}
+                    onClick={() => togglePicker('endDate')}
+                  >
+                    {formatDatePill(parseDate(endDate), dict.date)}
+                  </Pill>
+                  {!allDay && (
+                    <Pill
+                      active={picker === 'endTime'}
+                      invalid={rangeError}
+                      onClick={() => togglePicker('endTime')}
+                    >
+                      {timeText(endTime)}
+                    </Pill>
+                  )}
+                </div>
+              </div>
+              {picker === 'endDate' && (
+                <div ref={panelRef}>
+                  <DatePanel
+                    value={endDate}
                     onChange={(v) => {
-                      setStartTime(v);
+                      setEndDate(v);
                       setRangeError(false);
                     }}
                   />
                 </div>
               )}
-            </div>
-            <div className="space-y-1 text-[12px] text-subink">
-              <div className="flex items-center gap-1.5">
-                <span className="w-9 shrink-0">{t.endsLabel}</span>
-                <DateSelect
-                  value={endDate}
-                  invalid={rangeError}
-                  onChange={(v) => {
-                    setEndDate(v);
-                    setRangeError(false);
-                  }}
-                />
-              </div>
-              {!allDay && (
-                <div className="pl-[42px]">
-                  <TimeSelect
+              {picker === 'endTime' && !allDay && (
+                <div ref={panelRef}>
+                  <TimePanel
                     value={endTime}
-                    invalid={rangeError}
                     onChange={(v) => {
                       setEndTime(v);
                       setRangeError(false);
@@ -310,8 +416,8 @@ export function WeeklyTimelineWidget() {
                 </div>
               )}
             </div>
-            {rangeError && <p className="text-[11.5px] text-danger">{t.rangeError}</p>}
-            <label className="flex items-center justify-between text-[12.5px] text-subink">
+            {rangeError && <p className="pt-1 text-[11.5px] text-danger">{t.rangeError}</p>}
+            <label className="flex items-center justify-between pt-3 text-[12.5px] text-subink">
               {t.alarmLabel}
               <select
                 value={alarmKey}
