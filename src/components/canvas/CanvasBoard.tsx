@@ -20,7 +20,8 @@ interface View {
   scale: number;
 }
 
-const INITIAL_VIEW: View = { x: 64, y: 32, scale: 1 };
+// 처음 열었을 때 소개 카드가 상단바 아래와 화면 왼쪽에서 같은 간격(33)으로 붙는다.
+const INITIAL_VIEW: View = { x: 33, y: 33, scale: 1 };
 
 export function CanvasBoard() {
   const dict = useDict();
@@ -81,6 +82,18 @@ export function CanvasBoard() {
     }
     clearFocus();
   }, [requestedWidgetId, widgets, clearFocus]);
+
+  // 위젯을 모두 닫으면 캔버스를 처음 위치로 부드럽게 되돌린다(안내 카드가 다시 제자리에 보이게).
+  const widgetCount = widgets.length;
+  const prevWidgetCount = useRef(widgetCount);
+  useEffect(() => {
+    if (prevWidgetCount.current > 0 && widgetCount === 0) {
+      setSmoothPan(true);
+      setView(INITIAL_VIEW);
+      window.setTimeout(() => setSmoothPan(false), 300);
+    }
+    prevWidgetCount.current = widgetCount;
+  }, [widgetCount]);
 
   const onWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     e.preventDefault();
