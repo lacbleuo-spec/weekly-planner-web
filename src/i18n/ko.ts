@@ -145,7 +145,14 @@ const ko = {
     title: '파일 이름',
     confirm: '저장',
   },
+  autoSave: {
+    label: '자동 저장',
+    needFile: '파일을 저장하거나 열면 켤 수 있어요.',
+    saving: '저장 중…',
+    saved: '저장됨',
+  },
   alerts: {
+    autoSaveFailMessage: '자동 저장에 실패해서 껐어요. 저장 메뉴로 직접 저장해 주세요.',
     saveDoneMessage: '저장했어요.',
     saveFailTitle: '저장에 실패했어요.',
     openDoneMessage: '파일을 열었어요.',

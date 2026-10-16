@@ -1,4 +1,4 @@
-import { ChevronDown, Copy, FilePlus2, FolderOpen, Info, Save } from 'lucide-react';
+import { Check, ChevronDown, Copy, FilePlus2, FolderOpen, Info, RefreshCw, Save } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { useDict, useLocale } from '../../i18n';
@@ -7,7 +7,6 @@ import {
   canPickSaveLocation,
   openSnapshotFile,
   saveSnapshotAs,
-  writeSnapshotToHandle,
   type FileSystemFileHandle,
   type OpenedFile,
 } from '../../services/fileStorage';
@@ -18,6 +17,7 @@ import { PromptDialog } from '../ui/PromptDialog';
 import { Toast } from '../ui/Toast';
 import { useToast } from '../ui/useToast';
 import { LanguageMenu } from './LanguageMenu';
+import { loadAutoSavePreference, saveAutoSavePreference, useAutoSave } from './useAutoSave';
 
 function emptySnapshot() {
   return {
@@ -47,9 +47,27 @@ export function TopBar() {
   const [pendingOpen, setPendingOpen] = useState<OpenedFile | null>(null);
   const [pendingNew, setPendingNew] = useState(false);
   const [nameToSave, setNameToSave] = useState<string | null>(null);
+  const [autoSave, setAutoSave] = useState(loadAutoSavePreference);
   const { message, showToast } = useToast();
 
   const currentSnapshot = () => ({ ...getSnapshot(), locale });
+
+  // 열려 있는 파일이 있으면, 켜져 있는 동안 변경 내용을 그 파일에 알아서 저장한다.
+  const session = useAutoSave({
+    handle,
+    enabled: autoSave,
+    getSnapshot: currentSnapshot,
+    onFail: () => {
+      setAutoSave(false); // 이번 접속에서만 끈다. 다음에 열면 저장해 둔 선택대로 켜진다.
+      showToast(dict.alerts.autoSaveFailMessage);
+    },
+  });
+
+  const toggleAutoSave = () => {
+    const next = !autoSave;
+    setAutoSave(next);
+    saveAutoSavePreference(next);
+  };
 
   const applyNewFile = (result: { handle: FileSystemFileHandle | null; fileName: string }) => {
     setHandle(result.handle);
@@ -58,6 +76,7 @@ export function TopBar() {
 
   const doNew = () => {
     loadSnapshot(emptySnapshot());
+    session.markClean();
     setHandle(null);
     setFileName(null);
     setPendingNew(false);
@@ -92,6 +111,7 @@ export function TopBar() {
       if (isLocale(pendingOpen.snapshot.locale)) setLocale(pendingOpen.snapshot.locale);
       setHandle(pendingOpen.handle);
       setFileName(pendingOpen.fileName);
+      session.markClean();
       showToast(dict.alerts.openDoneMessage);
     }
     setPendingOpen(null);
@@ -106,6 +126,7 @@ export function TopBar() {
       const result = await saveSnapshotAs(currentSnapshot(), dict.file, preferredName);
       if (result !== 'cancelled') {
         applyNewFile(result);
+        session.markClean();
         showToast(dict.alerts.saveDoneMessage);
       }
     } catch {
@@ -120,7 +141,7 @@ export function TopBar() {
     if (handle) {
       setBusy(true);
       try {
-        await writeSnapshotToHandle(handle, currentSnapshot());
+        await session.saveNow();
         showToast(dict.alerts.saveDoneMessage);
       } catch {
         showToast(dict.alerts.saveFailTitle);
@@ -175,6 +196,11 @@ export function TopBar() {
         {fileName && (
           <span className="truncate text-[13px] font-medium text-faint">{fileName}</span>
         )}
+        {session.active && (
+          <span className="shrink-0 text-[12px] font-normal text-faint">
+            {session.status === 'clean' ? dict.autoSave.saved : dict.autoSave.saving}
+          </span>
+        )}
       </h1>
 
       <div className="flex shrink-0 items-center gap-1">
@@ -222,6 +248,22 @@ export function TopBar() {
                   <Copy size={16} className="text-subink" />
                   <span className="text-[14px] font-medium text-ink">{dict.topbar.saveAs}</span>
                 </button>
+                {canPickSaveLocation() && (
+                  <button
+                    onClick={toggleAutoSave}
+                    disabled={!handle}
+                    title={handle ? undefined : dict.autoSave.needFile}
+                    role="menuitemcheckbox"
+                    aria-checked={autoSave}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-canvas disabled:opacity-50 disabled:hover:bg-transparent"
+                  >
+                    <RefreshCw size={16} className="text-subink" />
+                    <span className="flex-1 text-[14px] font-medium text-ink">
+                      {dict.autoSave.label}
+                    </span>
+                    {autoSave && <Check size={15} className="text-accent" />}
+                  </button>
+                )}
               </div>
             </>
           )}

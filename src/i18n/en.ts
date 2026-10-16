@@ -138,7 +138,14 @@ const en: Dictionary = {
     title: 'File name',
     confirm: 'Save',
   },
+  autoSave: {
+    label: 'Auto-save',
+    needFile: 'Turns on once you save or open a file.',
+    saving: 'Saving…',
+    saved: 'Saved',
+  },
   alerts: {
+    autoSaveFailMessage: 'Auto-save failed and was turned off. Use Save to save manually.',
     saveDoneMessage: 'Saved.',
     saveFailTitle: 'Could not save.',
     openDoneMessage: 'File opened.',
