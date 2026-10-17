@@ -223,19 +223,24 @@ export async function saveSnapshotAs(
   const showSaveFilePicker = getShowSaveFilePicker();
 
   if (showSaveFilePicker) {
+    let handle: FileSystemFileHandle | null = null;
     try {
-      const handle = await showSaveFilePicker({
+      handle = await showSaveFilePicker({
         suggestedName,
         types: fileTypes(labels),
       });
+    } catch (err) {
+      // 대화상자를 취소한 경우: 실패가 아니라 사용자가 그만둔 것이므로 그대로 반환.
+      if (err instanceof DOMException && err.name === 'AbortError') return 'cancelled';
+      // 대화상자 자체를 쓸 수 없는 환경이면 기본 다운로드 방식으로 대체한다.
+    }
+    if (handle) {
+      // 위치를 이미 고른 뒤의 쓰기 오류는 다운로드로 되돌리지 않고 그대로 알린다.
+      // (되돌리면 저장 대화상자가 한 번 더 뜨고, 고른 자리에는 빈 파일만 남는다.)
       const writable = await handle.createWritable();
       await writable.write(json);
       await writable.close();
       return { handle, fileName: handle.name };
-    } catch (err) {
-      // 대화상자를 취소한 경우: 실패가 아니라 사용자가 그만둔 것이므로 그대로 반환.
-      if (err instanceof DOMException && err.name === 'AbortError') return 'cancelled';
-      // 그 외 오류(권한 문제 등)는 기본 다운로드 방식으로 대체한다.
     }
   }
 
