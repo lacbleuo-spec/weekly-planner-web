@@ -190,6 +190,20 @@ export async function writeSnapshotToHandle(
   await writable.close();
 }
 
+// 연결된 파일의 글을 읽는다(다른 기기가 바꾼 내용을 가져오는 데 쓴다).
+export async function readTextFromHandle(handle: FileSystemFileHandle): Promise<string> {
+  const file = await handle.getFile();
+  return file.text();
+}
+
+// 연결된 파일에 글을 그대로 쓴다(병합한 결과를 올리는 데 쓴다).
+export async function writeTextToHandle(handle: FileSystemFileHandle, text: string): Promise<void> {
+  await ensureWritePermission(handle);
+  const writable = await handle.createWritable();
+  await writable.write(text);
+  await writable.close();
+}
+
 export interface SavedFile {
   handle: FileSystemFileHandle | null;
   fileName: string;

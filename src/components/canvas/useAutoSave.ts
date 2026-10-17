@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { writeSnapshotToHandle, type FileSystemFileHandle } from '../../services/fileStorage';
+import { syncOnce, type SyncState } from '../../lib/sync';
+import { readTextFromHandle, writeTextToHandle, type FileSystemFileHandle } from '../../services/fileStorage';
 import { usePlanningStore } from '../../store/usePlanningStore';
 import type { PlanningSnapshot } from '../../types/planning';
 
 // 마지막 변경 후 이만큼 조용하면 저장한다. 계속 편집해도 첫 변경 후 MAX_WAIT_MS 안에는 저장한다.
+// 다른 기기가 파일을 바꿨는지는 탭이 보이는 동안 POLL_MS마다, 그리고 탭으로 돌아올 때 확인한다.
 const DEBOUNCE_MS = 2000;
 const MAX_WAIT_MS = 10000;
+const POLL_MS = 15000;
 
 const PREF_KEY = 'weekboard/autosave';
 
@@ -46,8 +49,8 @@ interface UseAutoSaveOptions {
   onFail: () => void;
 }
 
-// 열려 있는 파일에 변경 내용을 알아서 덮어쓴다. 파일 쓰기는 한 번에 하나씩만 하도록 줄 세워서,
-// 직접 누른 저장과 자동 저장이 겹쳐도 오래된 내용이 나중에 덮어쓰지 않게 한다.
+// 열려 있는 파일과 화면의 데이터를 계속 맞춘다. 저장만 하는 게 아니라 파일을 읽어서 다른 기기(앱 등)가 바꾼 내용도 합친 뒤 쓴다.
+// 파일 읽기/쓰기는 한 번에 하나씩만 하도록 줄 세워서, 직접 누른 저장과 자동 저장이 겹쳐도 순서가 뒤바뀌지 않게 한다.
 export function useAutoSave({ handle, enabled, getSnapshot, onFail }: UseAutoSaveOptions) {
   const active = enabled && handle !== null;
   const [status, setStatus] = useState<AutoSaveStatus>('clean');
@@ -63,8 +66,9 @@ export function useAutoSave({ handle, enabled, getSnapshot, onFail }: UseAutoSav
     onFailRef.current = onFail;
   });
 
+  const syncState = useRef<SyncState>({ base: null });
   const version = useRef(0); // 데이터가 바뀔 때마다 1씩 올라간다
-  const savedVersion = useRef(0); // 마지막으로 파일에 쓴 시점의 version
+  const savedVersion = useRef(0); // 마지막으로 파일과 맞춘 시점의 version
   const timer = useRef<number | undefined>(undefined);
   const firstChangeAt = useRef<number | null>(null);
   const chain = useRef<Promise<void>>(Promise.resolve());
@@ -80,21 +84,33 @@ export function useAutoSave({ handle, enabled, getSnapshot, onFail }: UseAutoSav
 
   const needsSave = useCallback(() => version.current !== savedVersion.current, []);
 
-  const writeOnce = useCallback(async () => {
+  // 파일과 한 번 맞춘다(읽기 → 병합 → 필요하면 쓰기).
+  const syncOnceNow = useCallback(async () => {
     const h = handleRef.current;
     if (!h) return;
     const v = version.current;
     setStatus('saving');
-    await writeSnapshotToHandle(h, getSnapshotRef.current());
-    savedVersion.current = v;
-    setStatus(version.current === v ? 'clean' : 'pending');
+    try {
+      await syncOnce(
+        {
+          readRemote: () => readTextFromHandle(h),
+          writeRemote: (text) => writeTextToHandle(h, text),
+          getLocal: getSnapshotRef.current,
+          applyLocal: (merged) => usePlanningStore.getState().loadSnapshot(merged),
+        },
+        syncState.current
+      );
+      savedVersion.current = v;
+    } finally {
+      setStatus(version.current === savedVersion.current ? 'clean' : 'pending');
+    }
   }, []);
 
   const enqueue = useCallback(() => {
-    const run = chain.current.then(writeOnce);
+    const run = chain.current.then(syncOnceNow);
     chain.current = run.catch(() => undefined);
     return run;
-  }, [writeOnce]);
+  }, [syncOnceNow]);
 
   const schedule = useCallback(() => {
     const now = Date.now();
@@ -123,6 +139,12 @@ export function useAutoSave({ handle, enabled, getSnapshot, onFail }: UseAutoSav
     flushRef.current = flush;
   }, [flush]);
 
+  // 다른 기기의 변경을 가져오는 조용한 동기화. 일시적인 실패는 다음 기회에 다시 한다.
+  const poll = useCallback(() => {
+    if (!activeRef.current || blocked.current) return;
+    void enqueue().catch(() => undefined);
+  }, [enqueue]);
+
   // 데이터가 바뀌면 저장을 예약한다.
   useEffect(() => {
     const unsubscribe = usePlanningStore.subscribe((state, prev) => {
@@ -137,7 +159,7 @@ export function useAutoSave({ handle, enabled, getSnapshot, onFail }: UseAutoSav
     };
   }, [schedule]);
 
-  // 자동 저장을 켜거나 다른 파일로 바뀌면 막힘을 풀고, 꺼져 있는 동안 쌓인 변경이 있으면 저장한다.
+  // 자동 저장을 켜거나 다른 파일로 바뀌면 막힘을 풀고 한 번 맞춘다(꺼져 있는 동안 쌓인 변경도 올라간다).
   useEffect(() => {
     blocked.current = false;
     if (!active) {
@@ -145,7 +167,26 @@ export function useAutoSave({ handle, enabled, getSnapshot, onFail }: UseAutoSav
       return;
     }
     if (needsSave()) schedule();
-  }, [active, handle, clearTimer, needsSave, schedule]);
+    else poll();
+  }, [active, handle, clearTimer, needsSave, schedule, poll]);
+
+  // 탭이 보이는 동안 주기적으로, 그리고 탭으로 돌아올 때 파일을 확인한다.
+  useEffect(() => {
+    if (!active) return;
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') poll();
+    }, POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') poll();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [active, poll]);
 
   // 탭을 숨기거나 닫기 직전에는 기다리지 않고 바로 저장한다.
   useEffect(() => {
@@ -162,9 +203,11 @@ export function useAutoSave({ handle, enabled, getSnapshot, onFail }: UseAutoSav
   }, [flush]);
 
   // 열기/새로 만들기/다른 이름으로 저장 직후처럼, 지금 화면이 파일과 같다고 확정할 때 쓴다.
+  // 이때의 화면 내용을 "마지막으로 맞춘 상태"로 삼아 이후 병합의 기준으로 쓴다.
   const markClean = useCallback(() => {
     clearTimer();
     savedVersion.current = version.current;
+    syncState.current.base = getSnapshotRef.current();
     setStatus('clean');
   }, [clearTimer]);
 

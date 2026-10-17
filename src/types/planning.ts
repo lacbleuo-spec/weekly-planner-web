@@ -15,12 +15,14 @@ export interface LifeLineItem {
   id: string;
   title: string;
   createdAt: number;
+  updatedAt?: number; // 파일 병합용: 마지막으로 바꾼 시각
 }
 
 export interface TopGoal {
   id: string;
   title: string;
   createdAt: number;
+  updatedAt?: number; // 파일 병합용: 마지막으로 바꾼 시각
 }
 
 export interface RoadmapNode {
@@ -29,6 +31,7 @@ export interface RoadmapNode {
   parentId: string | null;
   title: string;
   createdAt: number;
+  updatedAt?: number; // 파일 병합용: 마지막으로 바꾼 시각
 }
 
 export interface DailyGoalItem {
@@ -38,6 +41,7 @@ export interface DailyGoalItem {
   title: string;
   done: boolean;
   createdAt: number;
+  updatedAt?: number; // 파일 병합용: 마지막으로 바꾼 시각
 }
 
 // 아이폰 캘린더처럼 실제 날짜/시각을 갖는 일정. 여러 날에 걸칠 수도 있다.
@@ -49,6 +53,7 @@ export interface CalendarEvent {
   allDay: boolean;
   alarmMinutesBefore: number | null; // null = 알림 없음, 0 = 이벤트 시간에, 그 외 = 시작 전 분(分)
   color: string;
+  updatedAt?: number;
 }
 
 // 대학교 시간표처럼 특정 날짜가 아니라 요일마다 매주 반복되는 루틴.
@@ -59,6 +64,7 @@ export interface RoutineBlock {
   endHour: number;
   title: string;
   color: string;
+  updatedAt?: number;
 }
 
 // 자유배치 캔버스 위의 위젯 인스턴스.
@@ -74,6 +80,7 @@ export interface CanvasWidget {
   config?: Record<string, string>;
   // 위젯 헤더의 눈 아이콘으로 가이드 말풍선을 따로 껐다 켤 수 있게 한다. 기본값(undefined)은 켜짐이다.
   guideVisible?: boolean;
+  updatedAt?: number;
 }
 
 export interface PlanningSnapshot {
@@ -86,5 +93,7 @@ export interface PlanningSnapshot {
   widgets: CanvasWidget[];
   // 저장한 시점의 화면 언어. 예전 파일에는 없을 수 있다.
   locale?: Locale;
+  // 지운 항목의 기록('컬렉션:id' -> 지운 시각). 여러 기기가 같은 파일을 쓸 때 지운 항목이 되살아나지 않게 한다.
+  tombstones?: Record<string, number>;
   updatedAt: number;
 }

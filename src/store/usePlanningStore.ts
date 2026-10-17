@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { mondayOfWeekId } from '../lib/date';
+import { COLLECTIONS, type CollectionKey } from '../lib/merge';
 import { createId } from '../lib/id';
 import type {
   CalendarEvent,
@@ -54,6 +55,50 @@ function moveById<T extends { id: string }>(list: T[], id: string, direction: Mo
   return next;
 }
 
+// 어떤 동작이든 상태가 바뀔 때, 바뀐 항목에는 수정 시각을, 사라진 항목에는 삭제 기록을 자동으로 남긴다.
+// (항목마다 코드를 고치지 않아도 되고, 병합이 "누가 더 최근에 바꿨는지"를 알 수 있게 된다.)
+let tracking = true; // 파일에서 불러오거나 병합한 결과를 넣을 때는 끈다
+
+type TrackedFields = Pick<
+  PlanningState,
+  | 'lifeLines'
+  | 'topGoals'
+  | 'roadmapNodes'
+  | 'dailyGoals'
+  | 'events'
+  | 'routineBlocks'
+  | 'widgets'
+  | 'tombstones'
+>;
+
+function stampChanges(state: TrackedFields, patch: Partial<TrackedFields>): Partial<TrackedFields> {
+  const now = Date.now();
+  const out: Partial<TrackedFields> = { ...patch };
+  let tombstones = state.tombstones;
+  for (const key of COLLECTIONS as readonly CollectionKey[]) {
+    const next = patch[key] as { id: string; updatedAt?: number }[] | undefined;
+    if (!next) continue;
+    const prev = state[key] as { id: string; updatedAt?: number }[];
+    const prevById = new Map(prev.map((i) => [i.id, i]));
+    const nextIds = new Set<string>();
+    let changed = false;
+    const stamped = next.map((item) => {
+      nextIds.add(item.id);
+      if (prevById.get(item.id) === item) return item;
+      changed = true;
+      return { ...item, updatedAt: now };
+    });
+    for (const old of prev) {
+      if (nextIds.has(old.id)) continue;
+      if (tombstones === state.tombstones) tombstones = { ...tombstones };
+      tombstones[`${key}:${old.id}`] = now;
+    }
+    (out as Record<string, unknown>)[key] = changed ? stamped : next;
+  }
+  if (tombstones !== state.tombstones) out.tombstones = tombstones;
+  return out;
+}
+
 interface PlanningState {
   lifeLines: LifeLineItem[];
   topGoals: TopGoal[];
@@ -62,6 +107,7 @@ interface PlanningState {
   events: CalendarEvent[];
   routineBlocks: RoutineBlock[];
   widgets: CanvasWidget[];
+  tombstones: Record<string, number>; // 지운 항목 기록('컬렉션:id' -> 지운 시각)
 
   addLifeLine: (title: string) => void;
   updateLifeLine: (id: string, title: string) => void;
@@ -111,192 +157,195 @@ const emptyState = {
   events: [],
   routineBlocks: [],
   widgets: [],
+  tombstones: {},
 };
 
-export const usePlanningStore = create<PlanningState>()((set, get) => ({
-  ...emptyState,
+export const usePlanningStore = create<PlanningState>()((rawSet, get) => {
+  const set: typeof rawSet = (partial, replace) =>
+    rawSet(
+      (state) => {
+        const patch = typeof partial === 'function' ? partial(state) : partial;
+        return tracking ? stampChanges(state, patch as Partial<TrackedFields>) : patch;
+      },
+      replace as false | undefined,
+    );
+  return {
+    ...emptyState,
 
-      addLifeLine: (title) =>
-        set((s) => ({
-          lifeLines: [...s.lifeLines, { id: createId(), title, createdAt: Date.now() }],
-        })),
-      updateLifeLine: (id, title) =>
-        set((s) => ({ lifeLines: s.lifeLines.map((l) => (l.id === id ? { ...l, title } : l)) })),
-      moveLifeLine: (id, direction) =>
-        set((s) => ({ lifeLines: moveById(s.lifeLines, id, direction) })),
-      deleteLifeLine: (id) =>
-        set((s) => ({ lifeLines: s.lifeLines.filter((l) => l.id !== id) })),
+    addLifeLine: (title) =>
+      set((s) => ({
+        lifeLines: [...s.lifeLines, { id: createId(), title, createdAt: Date.now() }],
+      })),
+    updateLifeLine: (id, title) =>
+      set((s) => ({ lifeLines: s.lifeLines.map((l) => (l.id === id ? { ...l, title } : l)) })),
+    moveLifeLine: (id, direction) => set((s) => ({ lifeLines: moveById(s.lifeLines, id, direction) })),
+    deleteLifeLine: (id) => set((s) => ({ lifeLines: s.lifeLines.filter((l) => l.id !== id) })),
 
-      addTopGoal: (title) =>
-        set((s) => ({
-          topGoals: [...s.topGoals, { id: createId(), title, createdAt: Date.now() }],
-        })),
-      updateTopGoal: (id, title) =>
-        set((s) => ({ topGoals: s.topGoals.map((g) => (g.id === id ? { ...g, title } : g)) })),
-      moveTopGoal: (id, direction) =>
-        set((s) => ({ topGoals: moveById(s.topGoals, id, direction) })),
-      deleteTopGoal: (id) =>
-        set((s) => ({
-          topGoals: s.topGoals.filter((g) => g.id !== id),
-          roadmapNodes: s.roadmapNodes.filter((n) => n.topGoalId !== id),
-        })),
+    addTopGoal: (title) =>
+      set((s) => ({
+        topGoals: [...s.topGoals, { id: createId(), title, createdAt: Date.now() }],
+      })),
+    updateTopGoal: (id, title) =>
+      set((s) => ({ topGoals: s.topGoals.map((g) => (g.id === id ? { ...g, title } : g)) })),
+    moveTopGoal: (id, direction) => set((s) => ({ topGoals: moveById(s.topGoals, id, direction) })),
+    deleteTopGoal: (id) =>
+      set((s) => ({
+        topGoals: s.topGoals.filter((g) => g.id !== id),
+        roadmapNodes: s.roadmapNodes.filter((n) => n.topGoalId !== id),
+      })),
 
-      addRoadmapNode: (topGoalId, parentId, title) =>
-        set((s) => ({
-          roadmapNodes: [
-            ...s.roadmapNodes,
-            { id: createId(), topGoalId, parentId, title, createdAt: Date.now() },
-          ],
-        })),
-      updateRoadmapNode: (id, title) =>
-        set((s) => ({
-          roadmapNodes: s.roadmapNodes.map((n) => (n.id === id ? { ...n, title } : n)),
-        })),
-      // 같은 부모(형제) 안에서만 순서를 바꾼다. moveDailyGoal과 같은 방식으로
-      // 형제끼리만 뽑아 순서를 바꾼 뒤 원래 있던 자리에 다시 끼워 넣는다.
-      moveRoadmapNode: (id, direction) =>
-        set((s) => {
-          const node = s.roadmapNodes.find((n) => n.id === id);
-          if (!node) return {};
-          const siblings = s.roadmapNodes.filter(
-            (n) => n.topGoalId === node.topGoalId && n.parentId === node.parentId
-          );
-          const reordered = moveById(siblings, id, direction);
-          if (reordered === siblings) return {};
-          let i = 0;
-          return {
-            roadmapNodes: s.roadmapNodes.map((n) =>
-              n.topGoalId === node.topGoalId && n.parentId === node.parentId
-                ? reordered[i++]
-                : n
-            ),
-          };
-        }),
-      deleteRoadmapNode: (id) =>
-        set((s) => {
-          const toDelete = new Set([id]);
-          let changed = true;
-          while (changed) {
-            changed = false;
-            for (const n of s.roadmapNodes) {
-              if (n.parentId && toDelete.has(n.parentId) && !toDelete.has(n.id)) {
-                toDelete.add(n.id);
-                changed = true;
-              }
+    addRoadmapNode: (topGoalId, parentId, title) =>
+      set((s) => ({
+        roadmapNodes: [
+          ...s.roadmapNodes,
+          { id: createId(), topGoalId, parentId, title, createdAt: Date.now() },
+        ],
+      })),
+    updateRoadmapNode: (id, title) =>
+      set((s) => ({
+        roadmapNodes: s.roadmapNodes.map((n) => (n.id === id ? { ...n, title } : n)),
+      })),
+    // 같은 부모(형제) 안에서만 순서를 바꾼다. moveDailyGoal과 같은 방식으로
+    // 형제끼리만 뽑아 순서를 바꾼 뒤 원래 있던 자리에 다시 끼워 넣는다.
+    moveRoadmapNode: (id, direction) =>
+      set((s) => {
+        const node = s.roadmapNodes.find((n) => n.id === id);
+        if (!node) return {};
+        const siblings = s.roadmapNodes.filter(
+          (n) => n.topGoalId === node.topGoalId && n.parentId === node.parentId,
+        );
+        const reordered = moveById(siblings, id, direction);
+        if (reordered === siblings) return {};
+        let i = 0;
+        return {
+          roadmapNodes: s.roadmapNodes.map((n) =>
+            n.topGoalId === node.topGoalId && n.parentId === node.parentId ? reordered[i++] : n,
+          ),
+        };
+      }),
+    deleteRoadmapNode: (id) =>
+      set((s) => {
+        const toDelete = new Set([id]);
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (const n of s.roadmapNodes) {
+            if (n.parentId && toDelete.has(n.parentId) && !toDelete.has(n.id)) {
+              toDelete.add(n.id);
+              changed = true;
             }
           }
-          return { roadmapNodes: s.roadmapNodes.filter((n) => !toDelete.has(n.id)) };
-        }),
+        }
+        return { roadmapNodes: s.roadmapNodes.filter((n) => !toDelete.has(n.id)) };
+      }),
 
-      addDailyGoal: (date, title, roadmapNodeId = null) =>
-        set((s) => ({
-          dailyGoals: [
-            ...s.dailyGoals,
-            { id: createId(), date, title, roadmapNodeId, done: false, createdAt: Date.now() },
-          ],
-        })),
-      updateDailyGoal: (id, title) =>
-        set((s) => ({
-          dailyGoals: s.dailyGoals.map((g) => (g.id === id ? { ...g, title } : g)),
-        })),
-      // dailyGoals는 모든 날의 항목을 한 배열에 같이 담고 있어서, 같은 날 항목끼리만
-      // 뽑아 순서를 바꾼 뒤 원래 자리(그 날 항목이 있던 인덱스들)에 다시 끼워 넣는다.
-      moveDailyGoal: (id, direction) =>
-        set((s) => {
-          const goal = s.dailyGoals.find((g) => g.id === id);
-          if (!goal) return {};
-          const sameDay = s.dailyGoals.filter((g) => g.date === goal.date);
-          const reordered = moveById(sameDay, id, direction);
-          if (reordered === sameDay) return {};
-          let i = 0;
-          return {
-            dailyGoals: s.dailyGoals.map((g) => (g.date === goal.date ? reordered[i++] : g)),
-          };
-        }),
-      toggleDailyGoalDone: (id) =>
-        set((s) => ({
-          dailyGoals: s.dailyGoals.map((g) => (g.id === id ? { ...g, done: !g.done } : g)),
-        })),
-      deleteDailyGoal: (id) =>
-        set((s) => ({
-          dailyGoals: s.dailyGoals.filter((g) => g.id !== id),
-        })),
-
-      addEvent: (event) => {
-        const id = createId();
-        set((s) => ({ events: [...s.events, { ...event, id }] }));
-        return id;
-      },
-      updateEvent: (id, patch) =>
-        set((s) => ({ events: s.events.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
-      deleteEvent: (id) => set((s) => ({ events: s.events.filter((e) => e.id !== id) })),
-
-      addRoutineBlock: (block) => {
-        const id = createId();
-        set((s) => ({ routineBlocks: [...s.routineBlocks, { ...block, id }] }));
-        return id;
-      },
-      updateRoutineBlock: (id, patch) =>
-        set((s) => ({
-          routineBlocks: s.routineBlocks.map((b) => (b.id === id ? { ...b, ...patch } : b)),
-        })),
-      deleteRoutineBlock: (id) =>
-        set((s) => ({ routineBlocks: s.routineBlocks.filter((b) => b.id !== id) })),
-
-      addWidget: (type, config) =>
-        set((s) => {
-          const { width, height } = DEFAULT_SIZE[type];
-          const { x, y } = nextPlacement();
-          const maxZ = s.widgets.reduce((m, w) => Math.max(m, w.zIndex), 0);
-          const widget: CanvasWidget = {
-            id: createId(),
-            type,
-            x,
-            y,
-            width,
-            height,
-            zIndex: maxZ + 1,
-            config,
-          };
-          return { widgets: [...s.widgets, widget] };
-        }),
-      moveWidget: (id, x, y) =>
-        set((s) => ({ widgets: s.widgets.map((w) => (w.id === id ? { ...w, x, y } : w)) })),
-      removeWidget: (id) => set((s) => ({ widgets: s.widgets.filter((w) => w.id !== id) })),
-      bringToFront: (id) =>
-        set((s) => {
-          const maxZ = s.widgets.reduce((m, w) => Math.max(m, w.zIndex), 0);
-          return {
-            widgets: s.widgets.map((w) => (w.id === id ? { ...w, zIndex: maxZ + 1 } : w)),
-          };
-        }),
-      setWidgetConfig: (id, config) =>
-        set((s) => ({
-          widgets: s.widgets.map((w) =>
-            w.id === id ? { ...w, config: { ...w.config, ...config } } : w
-          ),
-        })),
-      toggleWidgetGuideVisible: (id) =>
-        set((s) => ({
-          widgets: s.widgets.map((w) =>
-            w.id === id ? { ...w, guideVisible: !(w.guideVisible ?? true) } : w
-          ),
-        })),
-
-      getSnapshot: () => {
-        const s = get();
+    addDailyGoal: (date, title, roadmapNodeId = null) =>
+      set((s) => ({
+        dailyGoals: [
+          ...s.dailyGoals,
+          { id: createId(), date, title, roadmapNodeId, done: false, createdAt: Date.now() },
+        ],
+      })),
+    updateDailyGoal: (id, title) =>
+      set((s) => ({
+        dailyGoals: s.dailyGoals.map((g) => (g.id === id ? { ...g, title } : g)),
+      })),
+    // dailyGoals는 모든 날의 항목을 한 배열에 같이 담고 있어서, 같은 날 항목끼리만
+    // 뽑아 순서를 바꾼 뒤 원래 자리(그 날 항목이 있던 인덱스들)에 다시 끼워 넣는다.
+    moveDailyGoal: (id, direction) =>
+      set((s) => {
+        const goal = s.dailyGoals.find((g) => g.id === id);
+        if (!goal) return {};
+        const sameDay = s.dailyGoals.filter((g) => g.date === goal.date);
+        const reordered = moveById(sameDay, id, direction);
+        if (reordered === sameDay) return {};
+        let i = 0;
         return {
-          lifeLines: s.lifeLines,
-          topGoals: s.topGoals,
-          roadmapNodes: s.roadmapNodes,
-          dailyGoals: s.dailyGoals,
-          events: s.events,
-          routineBlocks: s.routineBlocks,
-          widgets: s.widgets,
-          updatedAt: Date.now(),
+          dailyGoals: s.dailyGoals.map((g) => (g.date === goal.date ? reordered[i++] : g)),
         };
-      },
-      loadSnapshot: (snapshot) =>
+      }),
+    toggleDailyGoalDone: (id) =>
+      set((s) => ({
+        dailyGoals: s.dailyGoals.map((g) => (g.id === id ? { ...g, done: !g.done } : g)),
+      })),
+    deleteDailyGoal: (id) =>
+      set((s) => ({
+        dailyGoals: s.dailyGoals.filter((g) => g.id !== id),
+      })),
+
+    addEvent: (event) => {
+      const id = createId();
+      set((s) => ({ events: [...s.events, { ...event, id }] }));
+      return id;
+    },
+    updateEvent: (id, patch) =>
+      set((s) => ({ events: s.events.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
+    deleteEvent: (id) => set((s) => ({ events: s.events.filter((e) => e.id !== id) })),
+
+    addRoutineBlock: (block) => {
+      const id = createId();
+      set((s) => ({ routineBlocks: [...s.routineBlocks, { ...block, id }] }));
+      return id;
+    },
+    updateRoutineBlock: (id, patch) =>
+      set((s) => ({
+        routineBlocks: s.routineBlocks.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+      })),
+    deleteRoutineBlock: (id) => set((s) => ({ routineBlocks: s.routineBlocks.filter((b) => b.id !== id) })),
+
+    addWidget: (type, config) =>
+      set((s) => {
+        const { width, height } = DEFAULT_SIZE[type];
+        const { x, y } = nextPlacement();
+        const maxZ = s.widgets.reduce((m, w) => Math.max(m, w.zIndex), 0);
+        const widget: CanvasWidget = {
+          id: createId(),
+          type,
+          x,
+          y,
+          width,
+          height,
+          zIndex: maxZ + 1,
+          config,
+        };
+        return { widgets: [...s.widgets, widget] };
+      }),
+    moveWidget: (id, x, y) =>
+      set((s) => ({ widgets: s.widgets.map((w) => (w.id === id ? { ...w, x, y } : w)) })),
+    removeWidget: (id) => set((s) => ({ widgets: s.widgets.filter((w) => w.id !== id) })),
+    bringToFront: (id) =>
+      set((s) => {
+        const maxZ = s.widgets.reduce((m, w) => Math.max(m, w.zIndex), 0);
+        return {
+          widgets: s.widgets.map((w) => (w.id === id ? { ...w, zIndex: maxZ + 1 } : w)),
+        };
+      }),
+    setWidgetConfig: (id, config) =>
+      set((s) => ({
+        widgets: s.widgets.map((w) => (w.id === id ? { ...w, config: { ...w.config, ...config } } : w)),
+      })),
+    toggleWidgetGuideVisible: (id) =>
+      set((s) => ({
+        widgets: s.widgets.map((w) => (w.id === id ? { ...w, guideVisible: !(w.guideVisible ?? true) } : w)),
+      })),
+
+    getSnapshot: () => {
+      const s = get();
+      return {
+        lifeLines: s.lifeLines,
+        topGoals: s.topGoals,
+        roadmapNodes: s.roadmapNodes,
+        dailyGoals: s.dailyGoals,
+        events: s.events,
+        routineBlocks: s.routineBlocks,
+        widgets: s.widgets,
+        tombstones: s.tombstones,
+        updatedAt: Date.now(),
+      };
+    },
+    loadSnapshot: (snapshot) => {
+      tracking = false; // 불러온 내용은 "내가 방금 바꾼 것"이 아니므로 수정 시각을 새로 찍지 않는다
+      try {
         set({
           lifeLines: snapshot.lifeLines ?? [],
           topGoals: snapshot.topGoals ?? [],
@@ -308,6 +357,11 @@ export const usePlanningStore = create<PlanningState>()((set, get) => ({
           widgets: (snapshot.widgets ?? [])
             .map((w) => ((w.type as string) === 'weeklyGoal' ? { ...w, type: 'dailyGoal' as const } : w))
             .filter((w) => w.type in DEFAULT_SIZE),
-        }),
-    })
-);
+          tombstones: snapshot.tombstones ?? {},
+        });
+      } finally {
+        tracking = true;
+      }
+    },
+  };
+});
