@@ -197,8 +197,14 @@ export function TopBar() {
           <span className="truncate text-[13px] font-medium text-faint">{fileName}</span>
         )}
         {session.active && (
-          <span className="shrink-0 text-[12px] font-normal text-faint">
-            {session.status === 'clean' ? dict.autoSave.saved : dict.autoSave.saving}
+          <span
+            className={`shrink-0 text-[12px] font-normal ${session.status === 'error' ? 'text-danger' : 'text-faint'}`}
+          >
+            {session.status === 'clean'
+              ? dict.autoSave.saved
+              : session.status === 'error'
+                ? dict.autoSave.error
+                : dict.autoSave.saving}
           </span>
         )}
       </h1>

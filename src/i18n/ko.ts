@@ -150,6 +150,7 @@ const ko = {
     needFile: '파일을 저장하거나 열면 켤 수 있어요.',
     saving: '저장 중…',
     saved: '저장됨',
+    error: '파일 오류',
   },
   alerts: {
     autoSaveFailMessage: '자동 저장에 실패해서 껐어요. 저장 메뉴로 직접 저장해 주세요.',

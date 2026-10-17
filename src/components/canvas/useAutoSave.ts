@@ -40,7 +40,7 @@ const DATA_KEYS = [
   'widgets',
 ] as const;
 
-export type AutoSaveStatus = 'clean' | 'pending' | 'saving';
+export type AutoSaveStatus = 'clean' | 'pending' | 'saving' | 'error';
 
 interface UseAutoSaveOptions {
   handle: FileSystemFileHandle | null;
@@ -90,6 +90,7 @@ export function useAutoSave({ handle, enabled, getSnapshot, onFail }: UseAutoSav
     if (!h) return;
     const v = version.current;
     setStatus('saving');
+    let ok = false;
     try {
       await syncOnce(
         {
@@ -101,8 +102,10 @@ export function useAutoSave({ handle, enabled, getSnapshot, onFail }: UseAutoSav
         syncState.current
       );
       savedVersion.current = v;
+      ok = true;
     } finally {
-      setStatus(version.current === savedVersion.current ? 'clean' : 'pending');
+      // 실패했는데 "저장됨"으로 보이면 안 된다. 다음 동기화가 성공하면 저절로 되돌아온다.
+      setStatus(!ok ? 'error' : version.current === savedVersion.current ? 'clean' : 'pending');
     }
   }, []);
 
@@ -127,7 +130,7 @@ export function useAutoSave({ handle, enabled, getSnapshot, onFail }: UseAutoSav
       await enqueue();
     } catch {
       blocked.current = true;
-      setStatus('pending');
+      setStatus('error');
       onFailRef.current();
       return;
     }
