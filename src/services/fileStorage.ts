@@ -171,6 +171,21 @@ export async function openSnapshotFile(labels: FileLabels): Promise<OpenedFile |
   return { snapshot, handle: null, fileName: file.name };
 }
 
+export type WriteAccess = 'granted' | 'denied' | 'unknown';
+
+// 열기로 연 파일은 읽기 권한만 받은 상태다. 사용자가 누른 클릭 안에서 쓰기 권한을 미리 받아 두면,
+// 자동 저장이 편집 도중에 갑자기 묻지 않는다. 저장한 파일은 저장 창에서 이미 허용된 상태라 묻지 않는다.
+export async function requestWriteAccess(handle: FileSystemFileHandle): Promise<WriteAccess> {
+  const opts = { mode: 'readwrite' as const };
+  try {
+    if ((await handle.queryPermission(opts)) === 'granted') return 'granted';
+    return (await handle.requestPermission(opts)) === 'granted' ? 'granted' : 'denied';
+  } catch {
+    // 클릭 직후가 아니면 브라우저가 묻지 못한다. 그때는 처음 저장할 때 다시 묻는다.
+    return 'unknown';
+  }
+}
+
 async function ensureWritePermission(handle: FileSystemFileHandle): Promise<void> {
   const opts = { mode: 'readwrite' as const };
   if ((await handle.queryPermission(opts)) === 'granted') return;

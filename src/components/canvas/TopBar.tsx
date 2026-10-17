@@ -6,6 +6,7 @@ import { isLocale } from '../../i18n/locale';
 import {
   canPickSaveLocation,
   openSnapshotFile,
+  requestWriteAccess,
   saveSnapshotAs,
   type FileSystemFileHandle,
   type OpenedFile,
@@ -104,17 +105,25 @@ export function TopBar() {
     }
   };
 
-  const confirmOpen = () => {
-    if (pendingOpen) {
-      loadSnapshot(pendingOpen.snapshot);
-      // 파일에 언어가 적혀 있으면 그 언어로 맞춘다(예전 파일은 지금 언어를 그대로 둔다).
-      if (isLocale(pendingOpen.snapshot.locale)) setLocale(pendingOpen.snapshot.locale);
-      setHandle(pendingOpen.handle);
-      setFileName(pendingOpen.fileName);
-      session.markClean();
+  const confirmOpen = async () => {
+    const opened = pendingOpen;
+    setPendingOpen(null);
+    if (!opened) return;
+    // 확인을 누른 이 클릭 안에서 쓰기 권한을 미리 받아 둔다(자동 저장이 편집 중에 갑자기 묻지 않게).
+    const access = opened.handle ? await requestWriteAccess(opened.handle) : 'unknown';
+    loadSnapshot(opened.snapshot);
+    // 파일에 언어가 적혀 있으면 그 언어로 맞춘다(예전 파일은 지금 언어를 그대로 둔다).
+    if (isLocale(opened.snapshot.locale)) setLocale(opened.snapshot.locale);
+    setHandle(opened.handle);
+    setFileName(opened.fileName);
+    session.markClean();
+    if (access === 'denied') {
+      setAutoSave(false); // 쓸 수 없는 파일에 자동 저장을 시도하지 않는다(이번 접속에서만 끈다).
+      showToast(dict.alerts.openReadOnlyMessage);
+    } else {
+      setAutoSave(loadAutoSavePreference());
       showToast(dict.alerts.openDoneMessage);
     }
-    setPendingOpen(null);
   };
 
   // 저장 위치를 직접 고를 수 있는 브라우저는 그 대화상자 안에서 이름도 같이 정하지만,
@@ -290,7 +299,7 @@ export function TopBar() {
         title={dict.confirm.openTitle}
         message={dict.confirm.openMessage}
         confirmLabel={dict.confirm.openConfirm}
-        onConfirm={confirmOpen}
+        onConfirm={() => void confirmOpen()}
         onCancel={() => setPendingOpen(null)}
       />
       <ConfirmDialog

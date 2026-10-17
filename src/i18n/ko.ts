@@ -157,6 +157,7 @@ const ko = {
     saveDoneMessage: '저장했어요.',
     saveFailTitle: '저장에 실패했어요.',
     openDoneMessage: '파일을 열었어요.',
+    openReadOnlyMessage: '파일을 열었어요. 쓰기를 허용하지 않아 자동 저장은 꺼 둘게요.',
     openInvalidFileMessage: '위크보드 파일이 아니에요.',
   },
   date: {

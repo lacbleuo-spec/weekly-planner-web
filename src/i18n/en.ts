@@ -150,6 +150,7 @@ const en: Dictionary = {
     saveDoneMessage: 'Saved.',
     saveFailTitle: 'Could not save.',
     openDoneMessage: 'File opened.',
+    openReadOnlyMessage: 'File opened. Auto-save is off because write access was not granted.',
     openInvalidFileMessage: 'This is not a Weekboard file.',
   },
   date: {
