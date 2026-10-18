@@ -31,7 +31,7 @@ interface FilePickerAcceptType {
 // 파일 대화상자에 보이는 문구는 현재 언어에 맞춰 호출하는 쪽에서 넘겨준다.
 export interface FileLabels {
   defaultName: string; // 확장자 없는 기본 파일명(예: "무제")
-  typeDescription: string; // 파일 형식 설명(예: "위크보드 파일")
+  typeDescription: string; // 파일 형식 설명(예: "Planner Toolkit 파일")
 }
 
 function fileTypes(labels: FileLabels): FilePickerAcceptType[] {

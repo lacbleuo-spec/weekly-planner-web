@@ -27,15 +27,15 @@ const aboutParagraphs: AboutParagraph[] = [
 
 const ko = {
   app: {
-    title: '위크보드',
+    title: 'Planner Toolkit', // 앱 이름은 번역하지 않고 영어로 고정한다.
   },
   file: {
     defaultName: '무제',
-    typeDescription: '위크보드 파일',
+    typeDescription: '플래너 툴킷 파일',
   },
   about: {
     open: '소개',
-    title: '위크보드에는 왜 연간 목표, 분기 목표, 월 목표, 주간 목표가 없을까요?',
+    title: '플래너 툴킷에는 왜 연간 목표, 분기 목표, 월 목표, 주간 목표가 없을까요?',
     paragraphs: aboutParagraphs,
   },
   topbar: {
@@ -47,7 +47,7 @@ const ko = {
     language: '언어',
   },
   canvas: {
-    emptyIntro: '위크보드는 목적, 목표, 루틴, 일정을 한 번에 관리하는 플래닝 도구입니다.',
+    emptyIntro: '플래너 툴킷은 목적, 목표, 루틴, 일정을 한 번에 관리하는 플래닝 도구입니다.',
     emptyHint: '오른쪽 아래 + 버튼으로 위젯을 추가하고 원하는 위치로 옮겨보세요.',
   },
   zoom: {
@@ -158,7 +158,7 @@ const ko = {
     saveFailTitle: '저장에 실패했어요.',
     openDoneMessage: '파일을 열었어요.',
     openReadOnlyMessage: '파일을 열었어요. 쓰기를 허용하지 않아 자동 저장은 꺼 둘게요.',
-    openInvalidFileMessage: '위크보드 파일이 아니에요.',
+    openInvalidFileMessage: '플래너 툴킷 파일이 아니에요.',
   },
   date: {
     // 요일 배열은 JS의 getDay()(0=일요일) 기준이다.

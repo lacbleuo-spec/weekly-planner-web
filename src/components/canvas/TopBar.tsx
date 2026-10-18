@@ -33,6 +33,13 @@ function emptySnapshot() {
   };
 }
 
+// 저장에 실패한 이유(오류 이름)를 알림에 붙인다. 예: "저장에 실패했어요. (NotAllowedError)"
+function failReason(err: unknown): string {
+  console.error('[save]', err);
+  const name = err instanceof Error ? err.name || err.message : '';
+  return name ? ` (${name})` : '';
+}
+
 export function TopBar() {
   const dict = useDict();
   const { locale, setLocale } = useLocale();
@@ -58,9 +65,9 @@ export function TopBar() {
     handle,
     enabled: autoSave,
     getSnapshot: currentSnapshot,
-    onFail: () => {
+    onFail: (err) => {
       setAutoSave(false); // 이번 접속에서만 끈다. 다음에 열면 저장해 둔 선택대로 켜진다.
-      showToast(dict.alerts.autoSaveFailMessage);
+      showToast(dict.alerts.autoSaveFailMessage + failReason(err));
     },
   });
 
@@ -138,8 +145,8 @@ export function TopBar() {
         session.markClean();
         showToast(dict.alerts.saveDoneMessage);
       }
-    } catch {
-      showToast(dict.alerts.saveFailTitle);
+    } catch (err) {
+      showToast(dict.alerts.saveFailTitle + failReason(err));
     } finally {
       setBusy(false);
     }
@@ -152,8 +159,8 @@ export function TopBar() {
       try {
         await session.saveNow();
         showToast(dict.alerts.saveDoneMessage);
-      } catch {
-        showToast(dict.alerts.saveFailTitle);
+      } catch (err) {
+        showToast(dict.alerts.saveFailTitle + failReason(err));
       } finally {
         setBusy(false);
       }

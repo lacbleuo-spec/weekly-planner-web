@@ -3,15 +3,15 @@ import type { Dictionary } from './ko';
 // ko.ts와 같은 모양을 따라야 한다(빠진 키가 있으면 타입 에러가 난다).
 const en: Dictionary = {
   app: {
-    title: 'Weekboard',
+    title: 'Planner Toolkit',
   },
   file: {
     defaultName: 'Untitled',
-    typeDescription: 'Weekboard file',
+    typeDescription: 'Planner Toolkit file',
   },
   about: {
     open: 'About',
-    title: 'Why does Weekboard have no yearly, quarterly, monthly, or weekly goals?',
+    title: 'Why does Planner Toolkit have no yearly, quarterly, monthly, or weekly goals?',
     paragraphs: [
       {
         text: "Even a plan that looked perfect starts to wobble the moment it meets real life.\nWork gets busier than expected, your body doesn't keep up the way you thought it would, and something that seemed important at first may turn out not to fit your direction once you actually try it.",
@@ -39,7 +39,7 @@ const en: Dictionary = {
   },
   canvas: {
     emptyIntro:
-      'Weekboard is a planning tool that manages your purpose, goals, routines, and schedule in one place.',
+      'Planner Toolkit is a planning tool that manages your purpose, goals, routines, and schedule in one place.',
     emptyHint: 'Add widgets with the + button at the bottom right, then move them where you like.',
   },
   zoom: {
@@ -151,7 +151,7 @@ const en: Dictionary = {
     saveFailTitle: 'Could not save.',
     openDoneMessage: 'File opened.',
     openReadOnlyMessage: 'File opened. Auto-save is off because write access was not granted.',
-    openInvalidFileMessage: 'This is not a Weekboard file.',
+    openInvalidFileMessage: 'This is not a Planner Toolkit file.',
   },
   date: {
     // 요일 배열은 JS의 getDay()(0=일요일) 기준이다.

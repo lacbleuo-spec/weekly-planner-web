@@ -46,7 +46,7 @@ interface UseAutoSaveOptions {
   handle: FileSystemFileHandle | null;
   enabled: boolean; // 사용자가 켠 상태 (파일이 있어야 실제로 동작한다)
   getSnapshot: () => PlanningSnapshot;
-  onFail: () => void;
+  onFail: (err: unknown) => void;
 }
 
 // 열려 있는 파일과 화면의 데이터를 계속 맞춘다. 저장만 하는 게 아니라 파일을 읽어서 다른 기기(앱 등)가 바꾼 내용도 합친 뒤 쓴다.
@@ -128,10 +128,10 @@ export function useAutoSave({ handle, enabled, getSnapshot, onFail }: UseAutoSav
     if (!activeRef.current || blocked.current || !needsSave()) return;
     try {
       await enqueue();
-    } catch {
+    } catch (err) {
       blocked.current = true;
       setStatus('error');
-      onFailRef.current();
+      onFailRef.current(err);
       return;
     }
     // 쓰는 동안 또 바뀌었으면 이어서 예약한다
