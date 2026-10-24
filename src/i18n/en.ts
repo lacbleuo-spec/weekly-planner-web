@@ -177,13 +177,13 @@ const en: Dictionary = {
     perWidgetToggleLabel: 'Show this widget guide',
     exampleLabel: 'Example',
     lifeLine: {
-      title: 'Write how you want to live, in one sentence.',
+      title: 'Write in one sentence how you want to live.',
       body: 'Having more than one is fine.',
       example: 'Live healthy in body and mind.',
     },
     topGoal: {
-      title: "Write what you want to achieve for your '{lifeLine}'.",
-      body: '',
+      title: 'Write what you want to achieve.',
+      body: 'Write it as a result.',
       example: 'Finish a half marathon',
     },
     roadmap: {
@@ -192,17 +192,17 @@ const en: Dictionary = {
       example: 'Finish a half marathon → Get help from a running app',
     },
     dailyGoal: {
-      title: "Look at your '{roadmap}' and plan only what you can do today.",
+      title: 'Plan only what you can do today.',
       body: 'Small wins matter more than you think.',
       example: 'Follow the running app guide',
     },
     timetable: {
-      title: 'Write what repeats every day, like sleep, commuting, meals, and chores.',
+      title: 'Write the routines that repeat every day, like sleep, commuting, meals, and chores.',
       body: 'Once it is written down, you can see at a glance how much time you really have.',
       example: '',
     },
     weeklyTimeline: {
-      title: 'Write appointments, reservations, meetings, and other scheduled events.',
+      title: 'Write appointments, reservations, meetings, and other events.',
       body: 'Once it is written down, you can see at a glance how much time you really have.',
       example: '',
     },
