@@ -1,8 +1,8 @@
 import { Plus, X } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useDict } from '../../i18n';
-import { PALETTE } from '../../lib/palette';
+import { hasRoutineOverlap, ROUTINE_COLOR_BRAND, routineColorMap } from '../../lib/routine';
 import { usePlanningStore } from '../../store/usePlanningStore';
 import { hourToTimeString, TimeRangeDial } from '../ui/TimeRangeDial';
 
@@ -73,9 +73,8 @@ export function TimetableWidget() {
   const [startHour, setStartHour] = useState(9);
   const [endHour, setEndHour] = useState(10);
   const [overlapDays, setOverlapDays] = useState<number[]>([]);
-  // 루틴을 저장할 때마다 다음 팔레트 색을 순서대로 써서 서로 다른 색이 붙게 한다.
-  // (선택한 요일 수만큼 늘어나는 routineBlocks.length를 그대로 쓰면 매번 같은 색이 나올 수 있다.)
-  const [nextColorIndex, setNextColorIndex] = useState(routineBlocks.length);
+  // 색은 저장하지 않고 그릴 때 계산한다: 요일마다 0시부터 시계 방향으로 진한 파랑 → 연한 파랑.
+  const colorOf = useMemo(() => routineColorMap(routineBlocks), [routineBlocks]);
 
   const openForm = () => {
     setTitle('');
@@ -99,9 +98,8 @@ export function TimetableWidget() {
     setOverlapDays([]);
   };
 
-  // 같은 요일에 시간이 겹치는 루틴이 이미 있는지 확인한다.
-  const overlaps = (day: number, s: number, e: number) =>
-    routineBlocks.some((b) => b.dayOfWeek === day && s < b.endHour && e > b.startHour);
+  // 같은 요일에 시간이 겹치는 루틴이 이미 있는지 확인한다(자정을 넘는 시간대도 포함 — lib/routine.ts).
+  const overlaps = (day: number, s: number, e: number) => hasRoutineOverlap(routineBlocks, day, s, e);
 
   const save = () => {
     const trimmed = title.trim();
@@ -111,11 +109,10 @@ export function TimetableWidget() {
       setOverlapDays(conflicts);
       return;
     }
-    const color = PALETTE[nextColorIndex % PALETTE.length];
+    // 저장하는 color는 기본값일 뿐이고, 화면에 보이는 색은 colorOf가 순서대로 정한다.
     selectedDays.forEach((dayOfWeek) => {
-      addRoutineBlock({ title: trimmed, dayOfWeek, startHour, endHour, color });
+      addRoutineBlock({ title: trimmed, dayOfWeek, startHour, endHour, color: ROUTINE_COLOR_BRAND });
     });
-    setNextColorIndex((i) => i + 1);
     setShowForm(false);
   };
 
@@ -163,7 +160,7 @@ export function TimetableWidget() {
               setEndHour(h);
               setOverlapDays([]);
             }}
-            previewArcs={previewBlocks.map((b) => ({ id: b.id, startHour: b.startHour, endHour: b.endHour, color: b.color }))}
+            previewArcs={previewBlocks.map((b) => ({ id: b.id, startHour: b.startHour, endHour: b.endHour, color: colorOf.get(b.id) ?? b.color }))}
             caption={`${t.startsLabel} · ${t.endsLabel}`}
           />
 
@@ -218,8 +215,8 @@ export function TimetableWidget() {
               key={b.id}
               d={describeArc(b.startHour, b.endHour, RADIUS)}
               strokeWidth={STROKE}
-              strokeLinecap="round"
-              stroke={b.color}
+              strokeLinecap="butt"
+              stroke={colorOf.get(b.id) ?? b.color}
               className="fill-none"
             >
               <title>{`${b.title} · ${hourToTimeString(b.startHour)}-${hourToTimeString(b.endHour)}`}</title>
@@ -235,7 +232,7 @@ export function TimetableWidget() {
         ) : (
           blocksForView.map((b) => (
             <div key={b.id} className="group flex items-center gap-2 rounded-control px-1.5 py-1 hover:bg-canvas">
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: b.color }} />
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: colorOf.get(b.id) ?? b.color }} />
               <span className="flex-1 truncate text-[12.5px] text-ink">{b.title}</span>
               <span className="shrink-0 text-[11px] text-subink">
                 {hourToTimeString(b.startHour)}-{hourToTimeString(b.endHour)}

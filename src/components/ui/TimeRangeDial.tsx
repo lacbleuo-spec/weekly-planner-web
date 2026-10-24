@@ -129,7 +129,7 @@ export function TimeRangeDial({ startHour, endHour, onChangeStart, onChangeEnd, 
             key={a.id}
             d={describeArc(a.startHour, a.endHour, RADIUS)}
             strokeWidth={STROKE}
-            strokeLinecap="round"
+            strokeLinecap="butt"
             stroke={a.color}
             className="fill-none"
             style={{ opacity: 0.3 }}
@@ -138,7 +138,7 @@ export function TimeRangeDial({ startHour, endHour, onChangeStart, onChangeEnd, 
         <path
           d={describeArc(startHour, endHour, RADIUS)}
           strokeWidth={STROKE}
-          strokeLinecap="round"
+          strokeLinecap="butt"
           className="fill-none stroke-accent"
         />
         <circle

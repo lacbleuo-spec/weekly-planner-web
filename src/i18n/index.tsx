@@ -17,9 +17,10 @@ import { isLocale, type Locale } from './locale';
 export type { Locale };
 
 // 언어 이름은 번역하지 않고, 각 언어로 적는다(어떤 언어로 보고 있어도 찾을 수 있게).
+// 목록 순서는 영어가 먼저, 한국어가 그다음이다.
 export const LOCALES: { id: Locale; name: string }[] = [
-  { id: 'ko', name: '한국어' },
   { id: 'en', name: 'English' },
+  { id: 'ko', name: '한국어' },
 ];
 
 // 새 언어를 추가하려면 같은 모양의 딕셔너리를 만들고 여기와 LOCALES에 등록한다.
@@ -27,15 +28,15 @@ const dictionaries: Record<Locale, Dictionary> = { ko, en };
 
 const STORAGE_KEY = 'weekboard/locale';
 
-// 이전에 고른 언어가 있으면 그것을, 없으면 브라우저 언어를 따른다.
+// 이전에 고른 언어가 있으면 그것을, 없으면 기본 언어(영어)로 시작한다. 브라우저 언어는 따르지 않는다.
 function initialLocale(): Locale {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (isLocale(saved)) return saved;
   } catch {
-    // 저장소를 쓸 수 없는 환경이면 브라우저 언어만 본다.
+    // 저장소를 쓸 수 없는 환경이면 기본 언어를 쓴다.
   }
-  return navigator.language.toLowerCase().startsWith('ko') ? 'ko' : 'en';
+  return 'en';
 }
 
 interface I18nContextValue {
