@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useDict } from '../../i18n';
 import { hasRoutineOverlap, ROUTINE_COLOR_BRAND, routineColorMap } from '../../lib/routine';
 import { usePlanningStore } from '../../store/usePlanningStore';
+import type { RoutineBlock } from '../../types/planning';
 import { hourToTimeString, TimeRangeDial } from '../ui/TimeRangeDial';
 
 // 요일별 보기 화면의 정적인(드래그 불가) 원형 개요 — TimeRangeDial과 같은 크기로 맞춘다.
@@ -62,12 +63,16 @@ export function TimetableWidget() {
 
   const routineBlocks = usePlanningStore((s) => s.routineBlocks);
   const addRoutineBlock = usePlanningStore((s) => s.addRoutineBlock);
+  const updateRoutineBlock = usePlanningStore((s) => s.updateRoutineBlock);
   const deleteRoutineBlock = usePlanningStore((s) => s.deleteRoutineBlock);
 
   const todayIndex = (new Date().getDay() + 6) % 7; // JS: 0=일 → 0=월 기준으로 보정
   const [viewDay, setViewDay] = useState(todayIndex);
 
   const [showForm, setShowForm] = useState(false);
+  // 목록에서 고른 루틴을 고치는 중이면 그 루틴과 "같은 루틴"(이름과 시간이 같은, 요일만 다른 것들)의 id. 새로 추가하는 중이면 빈 배열.
+  const [editingIds, setEditingIds] = useState<string[]>([]);
+  const editing = editingIds.length > 0;
   const [title, setTitle] = useState('');
   const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set());
   const [startHour, setStartHour] = useState(9);
@@ -77,6 +82,7 @@ export function TimetableWidget() {
   const colorOf = useMemo(() => routineColorMap(routineBlocks), [routineBlocks]);
 
   const openForm = () => {
+    setEditingIds([]);
     setTitle('');
     setSelectedDays(new Set([viewDay]));
     setStartHour(9);
@@ -84,6 +90,23 @@ export function TimetableWidget() {
     setOverlapDays([]);
     setShowForm(true);
   };
+
+  const openEdit = (b: RoutineBlock) => {
+    // 여러 요일에 한꺼번에 넣은 루틴은 고칠 때도 그 요일들이 그대로 선택된 채로 열린다.
+    const same = routineBlocks.filter(
+      (x) => x.title === b.title && x.startHour === b.startHour && x.endHour === b.endHour
+    );
+    setEditingIds(same.map((x) => x.id));
+    setTitle(b.title);
+    setSelectedDays(new Set(same.map((x) => x.dayOfWeek)));
+    setStartHour(b.startHour);
+    setEndHour(b.endHour);
+    setOverlapDays([]);
+    setShowForm(true);
+  };
+
+  // 고치는 중인 루틴 자신들은 겹침 검사와 미리보기에서 뺀다(자기 자리를 옮길 때 충돌로 보이면 안 된다).
+  const others = routineBlocks.filter((b) => !editingIds.includes(b.id));
 
   const toggleDay = (i: number) => {
     setSelectedDays((prev) => {
@@ -99,7 +122,7 @@ export function TimetableWidget() {
   };
 
   // 같은 요일에 시간이 겹치는 루틴이 이미 있는지 확인한다(자정을 넘는 시간대도 포함 — lib/routine.ts).
-  const overlaps = (day: number, s: number, e: number) => hasRoutineOverlap(routineBlocks, day, s, e);
+  const overlaps = (day: number, s: number, e: number) => hasRoutineOverlap(others, day, s, e);
 
   const save = () => {
     const trimmed = title.trim();
@@ -107,6 +130,21 @@ export function TimetableWidget() {
     const conflicts = Array.from(selectedDays).filter((day) => overlaps(day, startHour, endHour));
     if (conflicts.length > 0) {
       setOverlapDays(conflicts);
+      return;
+    }
+    if (editing) {
+      // 고른 요일에 이미 있는 루틴은 그 자리에서 고치고, 새로 고른 요일에는 만들고, 고르지 않은 요일의 것은 지운다.
+      const group = routineBlocks.filter((b) => editingIds.includes(b.id));
+      group.forEach((b) => {
+        if (selectedDays.has(b.dayOfWeek)) updateRoutineBlock(b.id, { title: trimmed, startHour, endHour });
+        else deleteRoutineBlock(b.id);
+      });
+      selectedDays.forEach((dayOfWeek) => {
+        if (group.some((b) => b.dayOfWeek === dayOfWeek)) return;
+        addRoutineBlock({ title: trimmed, dayOfWeek, startHour, endHour, color: ROUTINE_COLOR_BRAND });
+      });
+      if (!selectedDays.has(viewDay)) setViewDay(Array.from(selectedDays)[0]);
+      setShowForm(false);
       return;
     }
     // 저장하는 color는 기본값일 뿐이고, 화면에 보이는 색은 colorOf가 순서대로 정한다.
@@ -117,7 +155,7 @@ export function TimetableWidget() {
   };
 
   if (showForm) {
-    const previewBlocks = routineBlocks.filter((b) => selectedDays.has(b.dayOfWeek));
+    const previewBlocks = others.filter((b) => selectedDays.has(b.dayOfWeek));
 
     return (
       <div className="flex h-full flex-col">
@@ -231,12 +269,19 @@ export function TimetableWidget() {
           <p className="px-1 py-2 text-center text-[11.5px] text-faint">{t.empty}</p>
         ) : (
           blocksForView.map((b) => (
-            <div key={b.id} className="group flex items-center gap-2 rounded-control px-1.5 py-1 hover:bg-canvas">
+            <div key={b.id} className="group flex items-center gap-2 rounded-control px-1.5 py-1">
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: colorOf.get(b.id) ?? b.color }} />
-              <span className="flex-1 truncate text-[12.5px] text-ink">{b.title}</span>
-              <span className="shrink-0 text-[11px] text-subink">
+              {/* 글자를 눌렀을 때만 수정 창이 열린다. */}
+              <button
+                onClick={() => openEdit(b)}
+                className="min-w-0 truncate text-left text-[12.5px] text-ink hover:text-accent"
+              >
+                {b.title}
+              </button>
+              <span className="flex-1" />
+              <button onClick={() => openEdit(b)} className="shrink-0 text-[11px] text-subink hover:text-accent">
                 {hourToTimeString(b.startHour)}-{hourToTimeString(b.endHour)}
-              </span>
+              </button>
               <button
                 onClick={() => deleteRoutineBlock(b.id)}
                 className="shrink-0 text-faint opacity-0 transition hover:text-danger group-hover:opacity-100"
