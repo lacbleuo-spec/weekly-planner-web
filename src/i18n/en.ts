@@ -53,18 +53,18 @@ const en: Dictionary = {
   },
   widgets: {
     lifeLine: {
-      title: 'Life in one line',
+      title: 'A line to live by',
       empty: 'Nothing written yet.',
-      addPlaceholder: 'Write your life in one line',
+      addPlaceholder: 'Write a line to live by',
     },
     topGoal: {
-      title: 'Top goal',
-      empty: 'No top goals yet.',
-      addPlaceholder: 'Add a top goal',
+      title: 'Goals to achieve',
+      empty: 'No goals yet.',
+      addPlaceholder: 'Add a goal',
     },
     roadmap: {
       title: 'Mind map',
-      needTopGoal: 'Add a top goal first.',
+      needTopGoal: 'Add a goal first.',
       empty: 'Add ideas that come to mind for this goal.',
       addPlaceholder: 'New item',
       addChildPlaceholder: 'Sub-item',
@@ -177,17 +177,17 @@ const en: Dictionary = {
     perWidgetToggleLabel: 'Show this widget guide',
     exampleLabel: 'Example',
     lifeLine: {
-      title: 'Write in one sentence how you want to live.',
+      title: 'Write a line that guides your life.',
       body: 'Having more than one is fine.',
       example: 'Live healthy in body and mind.',
     },
     topGoal: {
-      title: 'Write what you want to achieve.',
-      body: 'Write it as a result.',
+      title: 'Write what you want to achieve in a short phrase.',
+      body: "Don't think about how yet. Just write what you want to achieve.",
       example: 'Finish a half marathon',
     },
     roadmap: {
-      title: "Freely spread out directions and ideas for your '{topGoal}'.",
+      title: 'Freely write down ways that could help you reach your goal.',
       body: '',
       example: 'Finish a half marathon → Get help from a running app',
     },

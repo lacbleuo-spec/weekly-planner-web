@@ -61,18 +61,18 @@ const ko = {
   },
   widgets: {
     lifeLine: {
-      title: '인생 한 줄',
-      empty: '아직 인생 한 줄이 없어요.',
-      addPlaceholder: '인생 한 줄 추가',
+      title: '인생을 이끄는 문장',
+      empty: '아직 인생을 이끄는 문장이 없어요.',
+      addPlaceholder: '인생을 이끄는 문장 추가',
     },
     topGoal: {
-      title: '최상위 목표',
-      empty: '아직 최상위 목표가 없어요.',
-      addPlaceholder: '최상위 목표 추가',
+      title: '이루고 싶은 목표',
+      empty: '아직 이루고 싶은 목표가 없어요.',
+      addPlaceholder: '이루고 싶은 목표 추가',
     },
     roadmap: {
       title: '마인드맵',
-      needTopGoal: '먼저 최상위 목표를 추가해주세요.',
+      needTopGoal: '먼저 이루고 싶은 목표를 추가해주세요.',
       empty: '이 목표를 위해 떠오르는 생각을 추가해보세요.',
       addPlaceholder: '새 항목',
       addChildPlaceholder: '하위 항목',
@@ -184,17 +184,17 @@ const ko = {
     perWidgetToggleLabel: '이 위젯 가이드 표시',
     exampleLabel: '예시',
     lifeLine: {
-      title: '어떻게 살고 싶은지 한 문장으로 적어보세요.',
+      title: '인생을 이끄는 문장을 적어보세요.',
       body: '여러 개여도 괜찮아요.',
       example: '몸도 마음도 건강하게 산다.',
     },
     topGoal: {
-      title: '이루고 싶은 것을 적어보세요.',
-      body: '결과의 형태로 적어보세요.',
+      title: '이루고 싶은 것을 짧은 구절로 적어보세요.',
+      body: '어떻게 할지는 지금 생각하지 말고 무엇을 이루고 싶은지만 적어보세요.',
       example: '하프 마라톤 완주',
     },
     roadmap: {
-      title: "'{topGoal}'를 위해 방향과 아이디어를 자유롭게 펼쳐보세요.",
+      title: '목표를 이루는 데 도움이 될 방법을 자유롭게 적어보세요.',
       body: '',
       example: '하프 마라톤 완주 → 보조 앱 도움 받기',
     },
